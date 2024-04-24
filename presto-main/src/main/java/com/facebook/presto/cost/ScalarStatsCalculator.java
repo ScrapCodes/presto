@@ -20,6 +20,7 @@ import com.facebook.presto.common.type.TypeSignature;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.function.FunctionKind;
 import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.ConstantExpression;
@@ -122,12 +123,13 @@ public class ScalarStatsCalculator
             }
 
             FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(call.getFunctionHandle());
+            System.out.println("functionMetadata arg types = " + functionMetadata.getArgumentTypes() + " functionMetadata getReturnType= " + functionMetadata.getReturnType());
             if (functionMetadata.getOperatorType().map(OperatorType::isArithmeticOperator).orElse(false)) {
                 return computeArithmeticBinaryStatistics(call, context);
             }
 
             RowExpression value = new RowExpressionOptimizer(metadata).optimize(call, OPTIMIZED, session);
-
+            System.out.println("RowExpression = " + value);
             if (isNull(value)) {
                 return nullStatsEstimate();
             }
@@ -140,6 +142,17 @@ public class ScalarStatsCalculator
             if (resolution.isCastFunction(call.getFunctionHandle())) {
                 return computeCastStatistics(call, context);
             }
+            // This may not be accurate for any compute intensive function e.g. Math.pow or POW
+            if (functionMetadata.getFunctionKind() == FunctionKind.SCALAR
+                    && functionMetadata.isDeterministic()
+                    && functionMetadata.getArgumentTypes().size() == 1
+                    && functionMetadata.getReturnType().equals(functionMetadata.getArgumentTypes().get(0))) {
+                // A type1UDF is SCALAR and deterministic function, accepts one column as argument and output with same width does not alter null_frac/NDV values.
+                System.out.println("Found a SCALAR, deterministic function with same output width as input." + functionMetadata.getName());
+                // Propagate costs
+                return propagateStatistics(call, context);
+            }
+
             return VariableStatsEstimate.unknown();
         }
 
@@ -198,6 +211,26 @@ public class ScalarStatsCalculator
             }
             return VariableStatsEstimate.unknown();
         }
+
+        private VariableStatsEstimate propagateStatistics(CallExpression call, Void context)
+        {
+            requireNonNull(call, "call is null");
+            VariableStatsEstimate sourceStats = call.getArguments().get(0).accept(this, context);
+
+            double distinctValuesCount = sourceStats.getDistinctValuesCount();
+            double lowValue = sourceStats.getLowValue();
+            double highValue = sourceStats.getHighValue();
+
+            return VariableStatsEstimate.builder()
+                    .setNullsFraction(sourceStats.getNullsFraction())
+                    .setLowValue(lowValue)
+                    .setHighValue(highValue)
+                    .setAverageRowSize(sourceStats.getAverageRowSize())
+                    .setDistinctValuesCount(distinctValuesCount)
+                    .setHistogram(sourceStats.getHistogram())
+                    .build();
+        }
+
 
         private VariableStatsEstimate computeCastStatistics(CallExpression call, Void context)
         {
