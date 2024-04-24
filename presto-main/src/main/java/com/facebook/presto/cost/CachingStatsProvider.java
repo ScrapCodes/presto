@@ -74,10 +74,11 @@ public final class CachingStatsProvider
 
             PlanNodeStatsEstimate stats = cache.get(node);
             if (stats != null) {
+                log.info("stats " + stats + " for node: " + node + " found in cache.");
                 return stats;
             }
-
             stats = statsCalculator.calculateStats(node, this, lookup, session, types);
+            log.info("stats " + stats + " for node: " + node + " not found in cache.");
             verify(cache.put(node, stats) == null, "Stats already set");
             return stats;
         }
