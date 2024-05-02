@@ -146,7 +146,6 @@ public class Analyzer
     {
         List<FunctionCall> externalFunctions = extractExternalFunctions(functionHandles, ImmutableList.of(predicate), functionAndTypeResolver);
         if (!externalFunctions.isEmpty()) {
-
             throw new SemanticException(NOT_SUPPORTED, predicate, "External functions in %s is not supported: %s", clause, externalFunctions);
         }
     }

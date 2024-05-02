@@ -21,6 +21,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.ScalarFunctionStatsCalculator;
 import com.facebook.presto.spi.function.ScalarOperator;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
@@ -640,6 +641,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice lower(@SqlType("varchar(x)") Slice slice)
     {
         return toLowerCase(slice);
@@ -649,6 +651,7 @@ public final class StringFunctions
     @ScalarFunction("lower")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice charLower(@SqlType("char(x)") Slice slice)
     {
         return lower(slice);
@@ -658,6 +661,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice upper(@SqlType("varchar(x)") Slice slice)
     {
         return toUpperCase(slice);
@@ -667,6 +671,7 @@ public final class StringFunctions
     @ScalarFunction("upper")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice charUpper(@SqlType("char(x)") Slice slice)
     {
         return upper(slice);
