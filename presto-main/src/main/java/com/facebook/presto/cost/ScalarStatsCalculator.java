@@ -20,7 +20,6 @@ import com.facebook.presto.common.type.TypeSignature;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.WarningCollector;
-import com.facebook.presto.spi.function.FunctionKind;
 import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.ConstantExpression;
@@ -142,16 +141,15 @@ public class ScalarStatsCalculator
             if (resolution.isCastFunction(call.getFunctionHandle())) {
                 return computeCastStatistics(call, context);
             }
-            // This may not be accurate for any compute intensive function e.g. Math.pow or POW
-            if (functionMetadata.getFunctionKind() == FunctionKind.SCALAR
-                    && functionMetadata.isDeterministic()
-                    && functionMetadata.getArgumentTypes().size() == 1
-                    && functionMetadata.getReturnType().equals(functionMetadata.getArgumentTypes().get(0))) {
-                // A type1UDF is SCALAR and deterministic function, accepts one column as argument and output with same width does not alter null_frac/NDV values.
-                System.out.println("Found a SCALAR, deterministic function with same output width as input." + functionMetadata.getName());
-                // Propagate costs
-                return propagateStatistics(call, context);
-            }
+
+//            if (functionMetadata.isDeterministic()) {
+//                // && functionMetadata.getArgumentTypes().size() == 1
+//                // && functionMetadata.getReturnType().equals(functionMetadata.getArgumentTypes().get(0))
+//                System.out.println("Found a SCALAR, deterministic function " + functionMetadata.getName());
+//                // Here a union of stats of all the args is done, which is like an upper bound
+//                // is not a generic approach e.g. is_null
+//                return computeCallStatistics(call, context);
+//            }
 
             return VariableStatsEstimate.unknown();
         }
@@ -212,25 +210,31 @@ public class ScalarStatsCalculator
             return VariableStatsEstimate.unknown();
         }
 
-        private VariableStatsEstimate propagateStatistics(CallExpression call, Void context)
+        private VariableStatsEstimate computeCallStatistics(CallExpression call, Void context)
         {
             requireNonNull(call, "call is null");
-            VariableStatsEstimate sourceStats = call.getArguments().get(0).accept(this, context);
+            VariableStatsEstimate sourceStatsSum = VariableStatsEstimate.unknown();
 
-            double distinctValuesCount = sourceStats.getDistinctValuesCount();
-            double lowValue = sourceStats.getLowValue();
-            double highValue = sourceStats.getHighValue();
+            for (int i = 0; i < call.getArguments().size(); i++) {
+                VariableStatsEstimate sourceStats = call.getArguments().get(i).accept(this, context);
+                if (!sourceStats.isUnknown()) {
+                    if (sourceStatsSum.isUnknown()) {
+                        sourceStatsSum = sourceStats;
+                    }
+                    else {
+                        StatisticRange s = sourceStatsSum.statisticRange().addAndSumDistinctValues(sourceStats.statisticRange());
+                        sourceStatsSum = VariableStatsEstimate.builder().setStatisticsRange(s)
+                                .setAverageRowSize(max(sourceStatsSum.getAverageRowSize(), sourceStats.getAverageRowSize()))
+                                .setNullsFraction(max(sourceStatsSum.getNullsFraction(), sourceStats.getNullsFraction()))
+                                .build();
+                        System.out.println("summing with " + sourceStats + "result =" + sourceStatsSum);
+                    }
+                }
+            }
 
-            return VariableStatsEstimate.builder()
-                    .setNullsFraction(sourceStats.getNullsFraction())
-                    .setLowValue(lowValue)
-                    .setHighValue(highValue)
-                    .setAverageRowSize(sourceStats.getAverageRowSize())
-                    .setDistinctValuesCount(distinctValuesCount)
-                    .setHistogram(sourceStats.getHistogram())
-                    .build();
+            System.out.println("call=" + call + " StatsEstimate=" + sourceStatsSum);
+            return sourceStatsSum;
         }
-
 
         private VariableStatsEstimate computeCastStatistics(CallExpression call, Void context)
         {

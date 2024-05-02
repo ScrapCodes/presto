@@ -21,7 +21,9 @@ import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.Parameter;
 import com.facebook.presto.spi.function.RoutineCharacteristics;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.ScalarFunctionStatsCalculator;
 import com.facebook.presto.spi.function.ScalarOperator;
+import com.facebook.presto.spi.function.ScalarStatsHeader;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
 import com.facebook.presto.spi.function.SqlInvokedScalarFunction;
 import com.facebook.presto.spi.function.SqlParameter;
@@ -163,6 +165,8 @@ public final class SqlInvokedScalarFromAnnotationsParser
         List<TypeVariableConstraint> typeVariableConstraints = stream(method.getAnnotationsByType(TypeParameter.class))
                 .map(t -> withVariadicBound(t.value(), t.boundedBy().isEmpty() ? null : t.boundedBy()))
                 .collect(toImmutableList());
+        ScalarFunctionStatsCalculator statsCalculator = method.getAnnotation(ScalarFunctionStatsCalculator.class);
+        final Optional<ScalarStatsHeader> scalarStatsHeader = Optional.ofNullable(statsCalculator).map(ScalarStatsHeader::new);
 
         return Stream.concat(Stream.of(functionHeader.value()), stream(functionHeader.alias()))
                 .map(name -> new SqlInvokedFunction(
@@ -175,7 +179,8 @@ public final class SqlInvokedScalarFromAnnotationsParser
                         body,
                         notVersioned(),
                         SCALAR,
-                        Optional.empty()))
+                        Optional.empty(),
+                        scalarStatsHeader))
                 .collect(toImmutableList());
     }
 
