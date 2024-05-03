@@ -21,6 +21,7 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.function.FunctionMetadata;
+import com.facebook.presto.spi.function.ScalarStatsHeader;
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.ConstantExpression;
 import com.facebook.presto.spi.relation.InputReferenceExpression;
@@ -142,6 +143,13 @@ public class ScalarStatsCalculator
                 return computeCastStatistics(call, context);
             }
 
+            if (functionMetadata.getStatsHeader().isPresent()) {
+                return computeCallStatistics(call, context, functionMetadata.getStatsHeader().get());
+            }
+            else {
+                System.out.println("Stats not found for func: " + functionMetadata.getName() + " " + call);
+            }
+
 //            if (functionMetadata.isDeterministic()) {
 //                // && functionMetadata.getArgumentTypes().size() == 1
 //                // && functionMetadata.getReturnType().equals(functionMetadata.getArgumentTypes().get(0))
@@ -210,16 +218,24 @@ public class ScalarStatsCalculator
             return VariableStatsEstimate.unknown();
         }
 
-        private VariableStatsEstimate computeCallStatistics(CallExpression call, Void context)
+        private VariableStatsEstimate computeCallStatistics(CallExpression call, Void context, ScalarStatsHeader statsHeader)
         {
             requireNonNull(call, "call is null");
             VariableStatsEstimate sourceStatsSum = VariableStatsEstimate.unknown();
 
             for (int i = 0; i < call.getArguments().size(); i++) {
                 VariableStatsEstimate sourceStats = call.getArguments().get(i).accept(this, context);
-                if (!sourceStats.isUnknown()) {
+                if (!sourceStats.isUnknown() && statsHeader.isPropagateStats()) {
                     if (sourceStatsSum.isUnknown()) {
                         sourceStatsSum = sourceStats;
+                    }
+                    else if (statsHeader.isIntersection()) {
+                        StatisticRange s = sourceStatsSum.statisticRange().intersect(sourceStats.statisticRange());
+                        sourceStatsSum = VariableStatsEstimate.builder().setStatisticsRange(s)
+                                .setAverageRowSize(min(sourceStatsSum.getAverageRowSize(), sourceStats.getAverageRowSize()))
+                                .setNullsFraction(min(sourceStatsSum.getNullsFraction(), sourceStats.getNullsFraction()))
+                                .build();
+                        System.out.println("intersect with " + sourceStats + "result =" + sourceStatsSum);
                     }
                     else {
                         StatisticRange s = sourceStatsSum.statisticRange().addAndSumDistinctValues(sourceStats.statisticRange());
@@ -231,7 +247,23 @@ public class ScalarStatsCalculator
                     }
                 }
             }
-
+            double nullFrac = sourceStatsSum.getNullsFraction() * statsHeader.getNullFractionAdjustFactor();
+            double avgRowSize = sourceStatsSum.getAverageRowSize() * statsHeader.getAvgRowSizeAdjustFactor();
+            double distinctValuesCount = sourceStatsSum.getDistinctValuesCount() * statsHeader.getDistinctValCountAdjustFactor();
+            if (!isNaN(statsHeader.getNullFraction())) {
+                nullFrac = statsHeader.getNullFraction();
+            }
+            if (!isNaN(statsHeader.getAvgRowSize())) {
+                avgRowSize = statsHeader.getAvgRowSize();
+            }
+            if (!isNaN(statsHeader.getDistinctValuesCount())) {
+                distinctValuesCount = statsHeader.getDistinctValuesCount();
+            }
+            sourceStatsSum = VariableStatsEstimate.builder().setStatisticsRange(sourceStatsSum.statisticRange())
+                    .setAverageRowSize(avgRowSize)
+                    .setNullsFraction(nullFrac)
+                    .setDistinctValuesCount(distinctValuesCount)
+                    .build();
             System.out.println("call=" + call + " StatsEstimate=" + sourceStatsSum);
             return sourceStatsSum;
         }

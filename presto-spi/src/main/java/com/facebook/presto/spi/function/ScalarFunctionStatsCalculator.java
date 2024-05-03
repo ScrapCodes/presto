@@ -33,7 +33,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * </p>
  * <ul>
  * <li>
- * 1. Provide multipliers for computing `nullFraction` and `avgRowSize`. These multiplier will be
+ * 1. Provide adjustment factor for computing `nullFraction` and `avgRowSize`. These adjustment factor will be
  * applied to input columns on which this function operates on. 1.0 is the default value indicating
  * Propagate input columns stats as is.
  * </li>
@@ -65,9 +65,9 @@ public @interface ScalarFunctionStatsCalculator
     double distinctValuesCount() default Double.NaN;
 
     /**
-     * distinctValuesCountMultiplier: a fraction multiplied to input column's distinctValuesCount.
+     * distinctValCountAdjustFactor: a fraction multiplied to input column's distinctValuesCount.
      */
-    double distinctValuesCountMultiplier() default 1.0;
+    double distinctValCountAdjustFactor() default 1.0;
 
     /**
      * Does this function produce a constant nullFraction, e.g. is_null(Slice) will alter column's null fraction
@@ -76,11 +76,11 @@ public @interface ScalarFunctionStatsCalculator
     double nullFraction() default Double.NaN;
 
     /**
-     * A `nullFraction` Fraction of column's entries that are null and nullFractionMultiplier is the
+     * A `nullFraction` Fraction of column's entries that are null and nullFractionAdjustFactor is the
      * number that is multiplied to input column's nullFraction value to compute this functions impact
      * on overall `nullFraction`.
      */
-    double nullFractionMultiplier() default 1.0;
+    double nullFractionAdjustFactor() default 1.0;
 
     /**
      * An `avgRowSize`: does this function impacts the size of each row e.g. a function like md5 may produce a
@@ -89,8 +89,8 @@ public @interface ScalarFunctionStatsCalculator
     double avgRowSize() default Double.NaN;
 
     /**
-     * An `avgRowSizeMultiplier`: does this function impacts the size of each row e.g. a function may alter the
+     * An `avgRowSizeAdjustFactor`: does this function impacts the size of each row e.g. a function may alter the
      * column type to a wider type e.g. varchar(20) -> varchar(40).
      */
-    double avgRowSizeMultiplier() default 1.0;
+    double avgRowSizeAdjustFactor() default 1.0;
 }
