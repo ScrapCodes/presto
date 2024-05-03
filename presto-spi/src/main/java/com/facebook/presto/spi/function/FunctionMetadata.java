@@ -303,6 +303,11 @@ public class FunctionMetadata
         return descriptor;
     }
 
+    public Optional<ScalarStatsHeader> getStatsHeader()
+    {
+        return statsHeader;
+    }
+
     @Override
     public boolean equals(Object obj)
     {

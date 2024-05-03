@@ -18,34 +18,34 @@ public class ScalarStatsHeader
     private boolean propagateStats;
     private boolean isIntersection;
     private double distinctValuesCount;
-    private double distinctValuesCountMultiplier;
+    private double distinctValCountAdjustFactor;
     private double nullFraction;
-    private double nullFractionMultiplier;
+    private double nullFractionAdjustFactor;
     private double avgRowSize;
-    private double avgRowSizeMultiplier;
+    private double avgRowSizeAdjustFactor;
 
-    private ScalarStatsHeader(boolean propagateStats, boolean isIntersection, double distinctValuesCount, double distinctValuesCountMultiplier, double nullFraction,
-            double nullFractionMultiplier, double avgRowSize, double avgRowSizeMultiplier)
+    private ScalarStatsHeader(boolean propagateStats, boolean isIntersection, double distinctValuesCount, double distinctValCountAdjustFactor, double nullFraction,
+            double nullFractionAdjustFactor, double avgRowSize, double avgRowSizeAdjustFactor)
     {
         this.propagateStats = propagateStats;
         this.isIntersection = isIntersection;
         this.distinctValuesCount = distinctValuesCount;
-        this.distinctValuesCountMultiplier = distinctValuesCountMultiplier;
+        this.distinctValCountAdjustFactor = distinctValCountAdjustFactor;
         this.nullFraction = nullFraction;
-        this.nullFractionMultiplier = nullFractionMultiplier;
+        this.nullFractionAdjustFactor = nullFractionAdjustFactor;
         this.avgRowSize = avgRowSize;
-        this.avgRowSizeMultiplier = avgRowSizeMultiplier;
+        this.avgRowSizeAdjustFactor = avgRowSizeAdjustFactor;
     }
 
     public ScalarStatsHeader(ScalarFunctionStatsCalculator statsHeader)
     {
-        new ScalarStatsHeader(statsHeader.propagateStats(), statsHeader.isIntersection(), statsHeader.distinctValuesCount(), statsHeader.distinctValuesCountMultiplier(),
-                statsHeader.nullFraction(), statsHeader.nullFractionMultiplier(), statsHeader.avgRowSize(), statsHeader.avgRowSizeMultiplier());
+        this(statsHeader.propagateStats(), statsHeader.isIntersection(), statsHeader.distinctValuesCount(), statsHeader.distinctValCountAdjustFactor(),
+                statsHeader.nullFraction(), statsHeader.nullFractionAdjustFactor(), statsHeader.avgRowSize(), statsHeader.avgRowSizeAdjustFactor());
     }
 
-    public double getAvgRowSizeMultiplier()
+    public double getAvgRowSizeAdjustFactor()
     {
-        return avgRowSizeMultiplier;
+        return avgRowSizeAdjustFactor;
     }
 
     public double getAvgRowSize()
@@ -53,9 +53,9 @@ public class ScalarStatsHeader
         return avgRowSize;
     }
 
-    public double getNullFractionMultiplier()
+    public double getNullFractionAdjustFactor()
     {
-        return nullFractionMultiplier;
+        return nullFractionAdjustFactor;
     }
 
     public double getNullFraction()
@@ -63,9 +63,9 @@ public class ScalarStatsHeader
         return nullFraction;
     }
 
-    public double getDistinctValuesCountMultiplier()
+    public double getDistinctValCountAdjustFactor()
     {
-        return distinctValuesCountMultiplier;
+        return distinctValCountAdjustFactor;
     }
 
     public double getDistinctValuesCount()
