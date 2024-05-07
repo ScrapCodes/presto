@@ -907,6 +907,7 @@ public final class StringFunctions
     @LiteralParameters({"x", "y", "u"})
     @Constraint(variable = "u", expression = "x + y")
     @SqlType("char(u)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Max")
     public static Slice concat(@LiteralParameter("x") Long x, @SqlType("char(x)") Slice left, @SqlType("char(y)") Slice right)
     {
         int rightLength = right.length();

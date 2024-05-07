@@ -150,15 +150,6 @@ public class ScalarStatsCalculator
                 System.out.println("Stats not found for func: " + functionMetadata.getName() + " " + call);
             }
 
-//            if (functionMetadata.isDeterministic()) {
-//                // && functionMetadata.getArgumentTypes().size() == 1
-//                // && functionMetadata.getReturnType().equals(functionMetadata.getArgumentTypes().get(0))
-//                System.out.println("Found a SCALAR, deterministic function " + functionMetadata.getName());
-//                // Here a union of stats of all the args is done, which is like an upper bound
-//                // is not a generic approach e.g. is_null
-//                return computeCallStatistics(call, context);
-//            }
-
             return VariableStatsEstimate.unknown();
         }
 
@@ -229,7 +220,7 @@ public class ScalarStatsCalculator
                     if (sourceStatsSum.isUnknown()) {
                         sourceStatsSum = sourceStats;
                     }
-                    else if (statsHeader.isIntersection()) {
+                    else if (statsHeader.getStatsResolver().equals("Max")) {
                         StatisticRange s = sourceStatsSum.statisticRange().intersect(sourceStats.statisticRange());
                         sourceStatsSum = VariableStatsEstimate.builder().setStatisticsRange(s)
                                 .setAverageRowSize(min(sourceStatsSum.getAverageRowSize(), sourceStats.getAverageRowSize()))
