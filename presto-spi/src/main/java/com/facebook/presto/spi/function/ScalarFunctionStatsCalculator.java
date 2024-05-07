@@ -48,15 +48,18 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface ScalarFunctionStatsCalculator
 {
     /**
-     * Disable or enable propagate stats behaviour. e.g. upper(Slice) will not alter any source stats for the
+     * Disable or enable propagate stats behaviour. A function (e.g. upper(Slice)) may not alter any source stats for the
      * input column passed as an argument. In this case it might be possible to just set propagate stats as true.
      * In cases where number of input columns are more than one, one has few choices i.e. is the resulting statistics
-     * a union of both column or an intersection. To achieve this behaviour please set `isIntersection` field
+     * a union of all columns, Max, Sum or an intersection. To achieve this behaviour please set `statsResolver` field
      * in conjunction of setting this. For more precise control consider supplying a callback via ... see Phase 3.
      */
     boolean propagateStats() default false;
 
-    boolean isIntersection() default false;
+    /**
+     * Possible values: Max, Sum, union and intersect.
+     */
+    String statsResolver() default "Max";
 
     /**
      * Distinct values count is another important statistic in measuring query perf characteristics,

@@ -16,7 +16,7 @@ package com.facebook.presto.spi.function;
 public class ScalarStatsHeader
 {
     private boolean propagateStats;
-    private boolean isIntersection;
+    private String statsResolver;
     private double distinctValuesCount;
     private double distinctValCountAdjustFactor;
     private double nullFraction;
@@ -24,11 +24,11 @@ public class ScalarStatsHeader
     private double avgRowSize;
     private double avgRowSizeAdjustFactor;
 
-    private ScalarStatsHeader(boolean propagateStats, boolean isIntersection, double distinctValuesCount, double distinctValCountAdjustFactor, double nullFraction,
+    private ScalarStatsHeader(boolean propagateStats, String statsResolver, double distinctValuesCount, double distinctValCountAdjustFactor, double nullFraction,
             double nullFractionAdjustFactor, double avgRowSize, double avgRowSizeAdjustFactor)
     {
         this.propagateStats = propagateStats;
-        this.isIntersection = isIntersection;
+        this.statsResolver = statsResolver;
         this.distinctValuesCount = distinctValuesCount;
         this.distinctValCountAdjustFactor = distinctValCountAdjustFactor;
         this.nullFraction = nullFraction;
@@ -39,7 +39,7 @@ public class ScalarStatsHeader
 
     public ScalarStatsHeader(ScalarFunctionStatsCalculator statsHeader)
     {
-        this(statsHeader.propagateStats(), statsHeader.isIntersection(), statsHeader.distinctValuesCount(), statsHeader.distinctValCountAdjustFactor(),
+        this(statsHeader.propagateStats(), statsHeader.statsResolver(), statsHeader.distinctValuesCount(), statsHeader.distinctValCountAdjustFactor(),
                 statsHeader.nullFraction(), statsHeader.nullFractionAdjustFactor(), statsHeader.avgRowSize(), statsHeader.avgRowSizeAdjustFactor());
     }
 
@@ -73,9 +73,9 @@ public class ScalarStatsHeader
         return distinctValuesCount;
     }
 
-    public boolean isIntersection()
+    public String getStatsResolver()
     {
-        return isIntersection;
+        return statsResolver;
     }
 
     public boolean isPropagateStats()
