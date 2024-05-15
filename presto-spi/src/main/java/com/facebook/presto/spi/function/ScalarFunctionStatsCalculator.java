@@ -57,9 +57,11 @@ public @interface ScalarFunctionStatsCalculator
     boolean propagateStats() default false;
 
     /**
-     * Possible values: Max, Sum, union and intersect.
+     * Possible values: First, Max, Sum, union and intersect.
+     * First: Indicates use only first parameter's stats and ignore the rest.
+     * Max: Take the max of all the stats across the columns. e.g. Max of all source stats for ndv, null_fractions etc...
      */
-    String statsResolver() default "Max";
+    String statsResolver() default "First";
 
     /**
      * Distinct values count is another important statistic in measuring query perf characteristics,
@@ -72,11 +74,14 @@ public @interface ScalarFunctionStatsCalculator
      */
     double distinctValCountAdjustFactor() default 1.0;
 
+    String distinctValCountMapper() default "x";
+
     /**
      * Does this function produce a constant nullFraction, e.g. is_null(Slice) will alter column's null fraction
      * value to 0.0.
      */
     double nullFraction() default Double.NaN;
+    String nullFractionMapper() default "x";
 
     /**
      * A `nullFraction` Fraction of column's entries that are null and nullFractionAdjustFactor is the
@@ -90,6 +95,7 @@ public @interface ScalarFunctionStatsCalculator
      * constant row size.
      */
     double avgRowSize() default Double.NaN;
+    String avgRowSizeMapper() default "x";
 
     /**
      * An `avgRowSizeAdjustFactor`: does this function impacts the size of each row e.g. a function may alter the

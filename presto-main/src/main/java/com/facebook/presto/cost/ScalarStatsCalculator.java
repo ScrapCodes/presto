@@ -129,7 +129,6 @@ public class ScalarStatsCalculator
             }
 
             RowExpression value = new RowExpressionOptimizer(metadata).optimize(call, OPTIMIZED, session);
-            System.out.println("RowExpression = " + value);
             if (isNull(value)) {
                 return nullStatsEstimate();
             }
@@ -220,11 +219,15 @@ public class ScalarStatsCalculator
                     if (sourceStatsSum.isUnknown()) {
                         sourceStatsSum = sourceStats;
                     }
+                    else if (statsHeader.getStatsResolver().equals("First")) {
+                        // Do nothing.
+                        System.out.println("First column source stats result =" + sourceStatsSum);
+                    }
                     else if (statsHeader.getStatsResolver().equals("Max")) {
-                        StatisticRange s = sourceStatsSum.statisticRange().intersect(sourceStats.statisticRange());
+                        StatisticRange s = sourceStatsSum.statisticRange().addAndMaxDistinctValues(sourceStats.statisticRange());
                         sourceStatsSum = VariableStatsEstimate.builder().setStatisticsRange(s)
-                                .setAverageRowSize(min(sourceStatsSum.getAverageRowSize(), sourceStats.getAverageRowSize()))
-                                .setNullsFraction(min(sourceStatsSum.getNullsFraction(), sourceStats.getNullsFraction()))
+                                .setAverageRowSize(max(sourceStatsSum.getAverageRowSize(), sourceStats.getAverageRowSize()))
+                                .setNullsFraction(max(sourceStatsSum.getNullsFraction(), sourceStats.getNullsFraction()))
                                 .build();
                         System.out.println("intersect with " + sourceStats + "result =" + sourceStatsSum);
                     }

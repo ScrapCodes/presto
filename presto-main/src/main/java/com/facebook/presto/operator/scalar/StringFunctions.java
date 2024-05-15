@@ -67,6 +67,7 @@ public final class StringFunctions
     @Description("convert Unicode code point to a string")
     @ScalarFunction
     @SqlType("varchar(1)")
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice chr(@SqlType(StandardTypes.BIGINT) long codepoint)
     {
         try {
@@ -80,6 +81,7 @@ public final class StringFunctions
     @Description("returns Unicode code point of a single character string")
     @ScalarFunction("codepoint")
     @SqlType(StandardTypes.INTEGER)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 4)
     public static long codepoint(@SqlType("varchar(1)") Slice slice)
     {
         checkCondition(countCodePoints(slice) == 1, INVALID_FUNCTION_ARGUMENT, "Input string must be a single character string");
@@ -91,6 +93,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 8)
     public static long length(@SqlType("varchar(x)") Slice slice)
     {
         return countCodePoints(slice);
@@ -100,6 +103,7 @@ public final class StringFunctions
     @ScalarFunction("length")
     @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 8)
     public static long charLength(@LiteralParameter("x") long x, @SqlType("char(x)") Slice slice)
     {
         return x;
@@ -109,6 +113,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice replace(@SqlType("varchar(x)") Slice str, @SqlType("varchar(y)") Slice search)
     {
         return replace(str, search, Slices.EMPTY_SLICE);
@@ -117,8 +122,9 @@ public final class StringFunctions
     @Description("greedily replaces occurrences of a pattern with a string")
     @ScalarFunction
     @LiteralParameters({"x", "y", "z", "u"})
-    @Constraint(variable = "u", expression = "min(2147483647, x + z * (x + 1))")
+    @Constraint(variable = "u", expression = "min(214748387, x + z * (x + 1))")
     @SqlType("varchar(u)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Max")
     public static Slice replace(@SqlType("varchar(x)") Slice str, @SqlType("varchar(y)") Slice search, @SqlType("varchar(z)") Slice replace)
     {
         // Empty search?
@@ -201,6 +207,8 @@ public final class StringFunctions
     @ScalarFunction("strpos")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 8, statsResolver = "expr") // There may be repeated values at different Rows, but their orders will be diff
+    // as a result ndv will increase.
     public static long stringPosition(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice substring)
     {
         return stringPositionFromStart(string, substring, 1);
@@ -210,6 +218,7 @@ public final class StringFunctions
     @ScalarFunction("strpos")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First", avgRowSize = 8)
     public static long stringPosition(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice substring, @SqlType(StandardTypes.BIGINT) long instance)
     {
         return stringPositionFromStart(string, substring, instance);
@@ -219,6 +228,7 @@ public final class StringFunctions
     @ScalarFunction("strrpos")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First", avgRowSize = 8)
     public static long stringReversePosition(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice substring)
     {
         return stringPositionFromEnd(string, substring, 1);
@@ -228,6 +238,7 @@ public final class StringFunctions
     @ScalarFunction("strrpos")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First", avgRowSize = 8)
     public static long stringReversePosition(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice substring, @SqlType(StandardTypes.BIGINT) long instance)
     {
         return stringPositionFromEnd(string, substring, instance);
@@ -289,6 +300,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice substr(@SqlType("varchar(x)") Slice utf8, @SqlType(StandardTypes.BIGINT) long start)
     {
         if ((start == 0) || utf8.length() == 0) {
@@ -327,6 +339,7 @@ public final class StringFunctions
     @ScalarFunction("substr")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charSubstr(@SqlType("char(x)") Slice utf8, @SqlType(StandardTypes.BIGINT) long start)
     {
         return substr(utf8, start);
@@ -336,6 +349,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice substr(@SqlType("varchar(x)") Slice utf8, @SqlType(StandardTypes.BIGINT) long start, @SqlType(StandardTypes.BIGINT) long length)
     {
         if (start == 0 || (length <= 0) || (utf8.length() == 0)) {
@@ -385,6 +399,7 @@ public final class StringFunctions
     @ScalarFunction("substr")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charSubstr(@SqlType("char(x)") Slice utf8, @SqlType(StandardTypes.BIGINT) long start, @SqlType(StandardTypes.BIGINT) long length)
     {
         return trimTrailingSpaces(substr(utf8, start, length));
@@ -393,6 +408,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType("array(varchar(x))")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Block split(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice delimiter)
     {
         return split(string, delimiter, string.length() + 1);
@@ -401,6 +417,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType("array(varchar(x))")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Block split(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice delimiter, @SqlType(StandardTypes.BIGINT) long limit)
     {
         checkCondition(limit > 0, INVALID_FUNCTION_ARGUMENT, "Limit must be positive");
@@ -443,6 +460,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "intersect")
     public static Slice splitPart(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice delimiter, @SqlType(StandardTypes.BIGINT) long index)
     {
         checkCondition(index > 0, INVALID_FUNCTION_ARGUMENT, "Index must be greater than zero");
@@ -492,6 +510,7 @@ public final class StringFunctions
     @ScalarFunction("ltrim")
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice leftTrim(@SqlType("varchar(x)") Slice slice)
     {
         return SliceUtf8.leftTrim(slice);
@@ -501,6 +520,7 @@ public final class StringFunctions
     @ScalarFunction("ltrim")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charLeftTrim(@SqlType("char(x)") Slice slice)
     {
         return SliceUtf8.leftTrim(slice);
@@ -510,6 +530,7 @@ public final class StringFunctions
     @ScalarFunction("rtrim")
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice rightTrim(@SqlType("varchar(x)") Slice slice)
     {
         return SliceUtf8.rightTrim(slice);
@@ -519,6 +540,7 @@ public final class StringFunctions
     @ScalarFunction("rtrim")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charRightTrim(@SqlType("char(x)") Slice slice)
     {
         return rightTrim(slice);
@@ -528,6 +550,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice trim(@SqlType("varchar(x)") Slice slice)
     {
         return SliceUtf8.trim(slice);
@@ -537,6 +560,7 @@ public final class StringFunctions
     @ScalarFunction("trim")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charTrim(@SqlType("char(x)") Slice slice)
     {
         return trim(slice);
@@ -546,6 +570,7 @@ public final class StringFunctions
     @ScalarFunction("ltrim")
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice leftTrim(@SqlType("varchar(x)") Slice slice, @SqlType(CodePointsType.NAME) int[] codePointsToTrim)
     {
         return SliceUtf8.leftTrim(slice, codePointsToTrim);
@@ -555,6 +580,7 @@ public final class StringFunctions
     @ScalarFunction("ltrim")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charLeftTrim(@SqlType("char(x)") Slice slice, @SqlType(CodePointsType.NAME) int[] codePointsToTrim)
     {
         return leftTrim(slice, codePointsToTrim);
@@ -564,6 +590,7 @@ public final class StringFunctions
     @ScalarFunction("rtrim")
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice rightTrim(@SqlType("varchar(x)") Slice slice, @SqlType(CodePointsType.NAME) int[] codePointsToTrim)
     {
         return SliceUtf8.rightTrim(slice, codePointsToTrim);
@@ -573,6 +600,7 @@ public final class StringFunctions
     @ScalarFunction("rtrim")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charRightTrim(@SqlType("char(x)") Slice slice, @SqlType(CodePointsType.NAME) int[] codePointsToTrim)
     {
         return trimTrailingSpaces(rightTrim(slice, codePointsToTrim));
@@ -582,6 +610,7 @@ public final class StringFunctions
     @ScalarFunction("trim")
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice trim(@SqlType("varchar(x)") Slice slice, @SqlType(CodePointsType.NAME) int[] codePointsToTrim)
     {
         return SliceUtf8.trim(slice, codePointsToTrim);
@@ -591,6 +620,7 @@ public final class StringFunctions
     @ScalarFunction("trim")
     @LiteralParameters("x")
     @SqlType("char(x)")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice charTrim(@SqlType("char(x)") Slice slice, @SqlType(CodePointsType.NAME) int[] codePointsToTrim)
     {
         return trimTrailingSpaces(trim(slice, codePointsToTrim));
@@ -599,6 +629,7 @@ public final class StringFunctions
     @ScalarOperator(OperatorType.CAST)
     @LiteralParameters("x")
     @SqlType(CodePointsType.NAME)
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static int[] castVarcharToCodePoints(@SqlType("varchar(x)") Slice slice)
     {
         return castToCodePoints(slice);
@@ -607,6 +638,7 @@ public final class StringFunctions
     @ScalarOperator(OperatorType.CAST)
     @SqlType(CodePointsType.NAME)
     @LiteralParameters("x")
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static int[] castCharToCodePoints(@LiteralParameter("x") Long charLength, @SqlType("char(x)") Slice slice)
     {
         return castToCodePoints(padSpaces(slice, charLength.intValue()));
@@ -734,6 +766,7 @@ public final class StringFunctions
     @ScalarFunction("lpad")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.VARCHAR)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Sum")
     public static Slice leftPad(@SqlType("varchar(x)") Slice text, @SqlType(StandardTypes.BIGINT) long targetLength, @SqlType("varchar(y)") Slice padString)
     {
         return pad(text, targetLength, padString, 0);
@@ -743,6 +776,7 @@ public final class StringFunctions
     @ScalarFunction("rpad")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.VARCHAR)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Sum")
     public static Slice rightPad(@SqlType("varchar(x)") Slice text, @SqlType(StandardTypes.BIGINT) long targetLength, @SqlType("varchar(y)") Slice padString)
     {
         return pad(text, targetLength, padString, text.length());
@@ -752,6 +786,8 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Sum", avgRowSize = 8)
+    // Rationale: We take worst case stats, i.e. distinct values are Sum of both params.
     public static long levenshteinDistance(@SqlType("varchar(x)") Slice left, @SqlType("varchar(y)") Slice right)
     {
         int[] leftCodePoints = castToCodePoints(left);
@@ -804,6 +840,8 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Sum", avgRowSize = 8)
+    // Rationale: We take worst case stats, i.e. distinct values are Sum of both params.
     public static long hammingDistance(@SqlType("varchar(x)") Slice left, @SqlType("varchar(y)") Slice right)
     {
         int distance = 0;
@@ -835,6 +873,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.VARCHAR)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice normalize(@SqlType("varchar(x)") Slice slice, @SqlType("varchar(y)") Slice form)
     {
         Normalizer.Form targetForm;
@@ -850,6 +889,7 @@ public final class StringFunctions
     @Description("decodes the UTF-8 encoded string")
     @ScalarFunction
     @SqlType(StandardTypes.VARCHAR)
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice fromUtf8(@SqlType(StandardTypes.VARBINARY) Slice slice)
     {
         return SliceUtf8.fixInvalidUtf8(slice);
@@ -859,6 +899,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType(StandardTypes.VARCHAR)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice fromUtf8(@SqlType(StandardTypes.VARBINARY) Slice slice, @SqlType("varchar(x)") Slice replacementCharacter)
     {
         int count = countCodePoints(replacementCharacter);
@@ -884,6 +925,7 @@ public final class StringFunctions
     @Description("decodes the UTF-8 encoded string")
     @ScalarFunction
     @SqlType(StandardTypes.VARCHAR)
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "First")
     public static Slice fromUtf8(@SqlType(StandardTypes.VARBINARY) Slice slice, @SqlType(StandardTypes.BIGINT) long replacementCodePoint)
     {
         if (replacementCodePoint > MAX_CODE_POINT || Character.getType((int) replacementCodePoint) == SURROGATE) {
@@ -896,6 +938,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType(StandardTypes.VARBINARY)
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice toUtf8(@SqlType("varchar(x)") Slice slice)
     {
         return slice;
@@ -907,7 +950,7 @@ public final class StringFunctions
     @LiteralParameters({"x", "y", "u"})
     @Constraint(variable = "u", expression = "x + y")
     @SqlType("char(u)")
-    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Max")
+    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Sum", nullFractionAdjustFactor = 0.7)
     public static Slice concat(@LiteralParameter("x") Long x, @SqlType("char(x)") Slice left, @SqlType("char(y)") Slice right)
     {
         int rightLength = right.length();
@@ -930,6 +973,7 @@ public final class StringFunctions
     @ScalarFunction("starts_with")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BOOLEAN)
+    @ScalarFunctionStatsCalculator(propagateStats = true, distinctValuesCount = 2.0, nullFraction = 0.0, avgRowSize = 1.0)
     public static Boolean startsWith(@SqlType("varchar(x)") Slice x, @SqlType("varchar(y)") Slice y)
     {
         if (x.length() < y.length()) {
@@ -944,6 +988,7 @@ public final class StringFunctions
     @ScalarFunction("ends_with")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BOOLEAN)
+    @ScalarFunctionStatsCalculator(propagateStats = true, distinctValuesCount = 2.0, nullFraction = 0.0, avgRowSize = 1.0)
     public static Boolean endsWith(@SqlType("varchar(x)") Slice x, @SqlType("varchar(y)") Slice y)
     {
         if (x.length() < y.length()) {

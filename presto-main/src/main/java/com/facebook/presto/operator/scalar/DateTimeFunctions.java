@@ -23,6 +23,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.ScalarFunctionStatsCalculator;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.type.TimestampOperators;
 import io.airlift.slice.Slice;
@@ -133,6 +134,7 @@ public final class DateTimeFunctions
     @Description("current time without time zone")
     @ScalarFunction("localtime")
     @SqlType(StandardTypes.TIME)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 8.0, nullFraction = 0.0, distinctValCountMapper = "rowCount()")
     public static long localTime(SqlFunctionProperties properties)
     {
         if (properties.isLegacyTimestamp()) {
@@ -153,6 +155,7 @@ public final class DateTimeFunctions
     @Description("current timestamp with time zone")
     @ScalarFunction(value = "current_timestamp", alias = "now")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 8.0, nullFraction = 0.0, distinctValCountMapper = "rowCount()")
     public static long currentTimestamp(SqlFunctionProperties properties)
     {
         try {
@@ -169,6 +172,7 @@ public final class DateTimeFunctions
     @Description("current timestamp without time zone")
     @ScalarFunction("localtimestamp")
     @SqlType(StandardTypes.TIMESTAMP)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 8.0, nullFraction = 0.0, distinctValCountMapper = "rowCount()")
     public static long localTimestamp(SqlFunctionProperties properties)
     {
         if (properties.isLegacyTimestamp()) {
@@ -180,6 +184,7 @@ public final class DateTimeFunctions
 
     @ScalarFunction("from_unixtime")
     @SqlType(StandardTypes.TIMESTAMP)
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static long fromUnixTime(@SqlType(StandardTypes.DOUBLE) double unixTime)
     {
         // This implementation fixes previous issue of precision loss when it comes for some edge cases.
@@ -193,6 +198,7 @@ public final class DateTimeFunctions
 
     @ScalarFunction("from_unixtime")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
+    @ScalarFunctionStatsCalculator(propagateStats = true, avgRowSize = 8.0)
     public static long fromUnixTime(@SqlType(StandardTypes.DOUBLE) double unixTime, @SqlType(StandardTypes.BIGINT) long hoursOffset, @SqlType(StandardTypes.BIGINT) long minutesOffset)
     {
         TimeZoneKey timeZoneKey;
@@ -220,6 +226,7 @@ public final class DateTimeFunctions
     @ScalarFunction("from_unixtime")
     @LiteralParameters("x")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static long fromUnixTime(@SqlType(StandardTypes.DOUBLE) double unixTime, @SqlType("varchar(x)") Slice zoneId)
     {
         try {
@@ -235,6 +242,7 @@ public final class DateTimeFunctions
 
     @ScalarFunction("to_unixtime")
     @SqlType(StandardTypes.DOUBLE)
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static double toUnixTime(@SqlType(StandardTypes.TIMESTAMP) long timestamp)
     {
         return timestamp / 1000.0;
@@ -242,6 +250,7 @@ public final class DateTimeFunctions
 
     @ScalarFunction("to_unixtime")
     @SqlType(StandardTypes.DOUBLE)
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static double toUnixTimeFromTimestampWithTimeZone(@SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
     {
         return unpackMillisUtc(timestampWithTimeZone) / 1000.0;
@@ -252,6 +261,7 @@ public final class DateTimeFunctions
     // YYYY-MM-DDTHH:MM:SS.mmm+HH:MM is a standard notation, and it requires 29 characters.
     // However extended notation with format ±(Y)+-MM-DDTHH:MM:SS.mmm+HH:MM is also acceptable and as
     // the maximum year represented by 64bits timestamp is ~584944387 it may require up to 35 characters.
+    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice toISO8601FromTimestamp(SqlFunctionProperties properties, @SqlType(StandardTypes.TIMESTAMP) long timestamp)
     {
         if (properties.isLegacyTimestamp()) {
