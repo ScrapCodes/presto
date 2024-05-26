@@ -13,39 +13,26 @@
  */
 package com.facebook.presto.spi.function;
 
+import java.util.Map;
+
 public class ScalarStatsHeader
 {
-    private boolean propagateStats;
-    private String statsResolver;
+    private Map<Integer, ScalarTypeStats> statsResolver;
     private double distinctValuesCount;
-    private double distinctValCountAdjustFactor;
     private double nullFraction;
-    private double nullFractionAdjustFactor;
     private double avgRowSize;
-    private double avgRowSizeAdjustFactor;
 
-    private ScalarStatsHeader(boolean propagateStats, String statsResolver, double distinctValuesCount, double distinctValCountAdjustFactor, double nullFraction,
-            double nullFractionAdjustFactor, double avgRowSize, double avgRowSizeAdjustFactor)
+    private ScalarStatsHeader(Map<Integer, ScalarTypeStats> statsResolver, double distinctValuesCount, double nullFraction, double avgRowSize)
     {
-        this.propagateStats = propagateStats;
         this.statsResolver = statsResolver;
         this.distinctValuesCount = distinctValuesCount;
-        this.distinctValCountAdjustFactor = distinctValCountAdjustFactor;
         this.nullFraction = nullFraction;
-        this.nullFractionAdjustFactor = nullFractionAdjustFactor;
         this.avgRowSize = avgRowSize;
-        this.avgRowSizeAdjustFactor = avgRowSizeAdjustFactor;
     }
 
-    public ScalarStatsHeader(ScalarFunctionStatsCalculator statsHeader)
+    public ScalarStatsHeader(ScalarFunctionStats statsHeader, Map<Integer, ScalarTypeStats> statsResolver)
     {
-        this(statsHeader.propagateStats(), statsHeader.statsResolver(), statsHeader.distinctValuesCount(), statsHeader.distinctValCountAdjustFactor(),
-                statsHeader.nullFraction(), statsHeader.nullFractionAdjustFactor(), statsHeader.avgRowSize(), statsHeader.avgRowSizeAdjustFactor());
-    }
-
-    public double getAvgRowSizeAdjustFactor()
-    {
-        return avgRowSizeAdjustFactor;
+        this(statsResolver, statsHeader.distinctValuesCount(), statsHeader.nullFraction(), statsHeader.avgRowSize());
     }
 
     public double getAvgRowSize()
@@ -53,19 +40,9 @@ public class ScalarStatsHeader
         return avgRowSize;
     }
 
-    public double getNullFractionAdjustFactor()
-    {
-        return nullFractionAdjustFactor;
-    }
-
     public double getNullFraction()
     {
         return nullFraction;
-    }
-
-    public double getDistinctValCountAdjustFactor()
-    {
-        return distinctValCountAdjustFactor;
     }
 
     public double getDistinctValuesCount()
@@ -73,13 +50,8 @@ public class ScalarStatsHeader
         return distinctValuesCount;
     }
 
-    public String getStatsResolver()
+    public Map<Integer, ScalarTypeStats> getStatsResolver()
     {
         return statsResolver;
-    }
-
-    public boolean isPropagateStats()
-    {
-        return propagateStats;
     }
 }

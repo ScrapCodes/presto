@@ -21,9 +21,11 @@ import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.Parameter;
 import com.facebook.presto.spi.function.RoutineCharacteristics;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.ScalarFunctionStats;
 import com.facebook.presto.spi.function.ScalarFunctionStatsCalculator;
 import com.facebook.presto.spi.function.ScalarOperator;
 import com.facebook.presto.spi.function.ScalarStatsHeader;
+import com.facebook.presto.spi.function.ScalarTypeStats;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
 import com.facebook.presto.spi.function.SqlInvokedScalarFunction;
 import com.facebook.presto.spi.function.SqlParameter;
@@ -35,9 +37,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.common.type.TypeSignature.parseTypeSignature;
@@ -165,8 +170,11 @@ public final class SqlInvokedScalarFromAnnotationsParser
         List<TypeVariableConstraint> typeVariableConstraints = stream(method.getAnnotationsByType(TypeParameter.class))
                 .map(t -> withVariadicBound(t.value(), t.boundedBy().isEmpty() ? null : t.boundedBy()))
                 .collect(toImmutableList());
-        ScalarFunctionStatsCalculator statsCalculator = method.getAnnotation(ScalarFunctionStatsCalculator.class);
-        final Optional<ScalarStatsHeader> scalarStatsHeader = Optional.ofNullable(statsCalculator).map(ScalarStatsHeader::new);
+        ScalarFunctionStats statsCalculator = method.getAnnotation(ScalarFunctionStats.class);
+        java.lang.reflect.Parameter[] params = method.getParameters();
+        Map<Integer, ScalarTypeStats> paramsStats = new HashMap<>();
+        IntStream.range(0, params.length).filter(x -> params[x] != null).forEachOrdered(x -> paramsStats.put(x, params[x].getAnnotation(ScalarTypeStats.class)));
+        final Optional<ScalarStatsHeader> scalarStatsHeader = Optional.ofNullable(statsCalculator).map(x -> new ScalarStatsHeader(x, paramsStats));
 
         return Stream.concat(Stream.of(functionHeader.value()), stream(functionHeader.alias()))
                 .map(name -> new SqlInvokedFunction(
