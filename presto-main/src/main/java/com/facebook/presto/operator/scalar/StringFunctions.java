@@ -21,8 +21,10 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.ScalarFunctionStats;
 import com.facebook.presto.spi.function.ScalarFunctionStatsCalculator;
 import com.facebook.presto.spi.function.ScalarOperator;
+import com.facebook.presto.spi.function.ScalarTypeStats;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.type.CodePointsType;
@@ -42,6 +44,9 @@ import static com.facebook.presto.common.type.Chars.padSpaces;
 import static com.facebook.presto.common.type.Chars.trimTrailingSpaces;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
+import static com.facebook.presto.spi.function.PropagateSourceStats.MAX;
+import static com.facebook.presto.spi.function.PropagateSourceStats.SOURCE_STATS;
+import static com.facebook.presto.spi.function.PropagateSourceStats.SUM;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.SliceUtf8.countCodePoints;
 import static io.airlift.slice.SliceUtf8.getCodePointAt;
@@ -55,7 +60,6 @@ import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Character.MAX_CODE_POINT;
 import static java.lang.Character.SURROGATE;
 import static java.lang.Math.toIntExact;
-
 /**
  * Current implementation is based on code points from Unicode and does ignore grapheme cluster boundaries.
  * Therefore only some methods work correctly with grapheme cluster boundaries.
@@ -119,7 +123,11 @@ public final class StringFunctions
     @LiteralParameters({"x", "y", "z", "u"})
     @Constraint(variable = "u", expression = "min(2147483647, x + z * (x + 1))")
     @SqlType("varchar(u)")
-    public static Slice replace(@SqlType("varchar(x)") Slice str, @SqlType("varchar(y)") Slice search, @SqlType("varchar(z)") Slice replace)
+    @ScalarFunctionStats
+    public static Slice replace(
+            @ScalarTypeStats(distinctValueCount = MAX, nullFraction = MAX) @SqlType("varchar(x)") Slice str,
+            @SqlType("varchar(y)") Slice search,
+            @SqlType("varchar(z)") Slice replace)
     {
         // Empty search?
         if (search.length() == 0) {
@@ -661,8 +669,8 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
-    @ScalarFunctionStatsCalculator(propagateStats = true)
-    public static Slice upper(@SqlType("varchar(x)") Slice slice)
+    @ScalarFunctionStats
+    public static Slice upper(@ScalarTypeStats @SqlType("varchar(x)") Slice slice)
     {
         return toUpperCase(slice);
     }
@@ -907,8 +915,10 @@ public final class StringFunctions
     @LiteralParameters({"x", "y", "u"})
     @Constraint(variable = "u", expression = "x + y")
     @SqlType("char(u)")
-    @ScalarFunctionStatsCalculator(propagateStats = true, statsResolver = "Max")
-    public static Slice concat(@LiteralParameter("x") Long x, @SqlType("char(x)") Slice left, @SqlType("char(y)") Slice right)
+    @ScalarFunctionStats
+    public static Slice concat(@LiteralParameter("x") Long x,
+            @ScalarTypeStats(distinctValueCount = SUM, nullFraction = SOURCE_STATS, avgRowSize = SUM) @SqlType("char(x)") Slice left,
+            @SqlType("char(y)") Slice right)
     {
         int rightLength = right.length();
         if (rightLength == 0) {
