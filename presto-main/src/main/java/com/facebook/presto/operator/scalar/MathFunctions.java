@@ -23,7 +23,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
-import com.facebook.presto.spi.function.ScalarFunctionStats;
+import com.facebook.presto.spi.function.ScalarFunctionConstantStats;
 import com.facebook.presto.spi.function.Signature;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
@@ -626,7 +626,7 @@ public final class MathFunctions
     @Description("the constant Pi")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    @ScalarFunctionStats(avgRowSize = 8.0, nullFraction = 0.0, distinctValuesCount = 1.0)
+    @ScalarFunctionConstantStats(avgRowSize = 8.0, nullFraction = 0.0, distinctValuesCount = 1.0)
     public static double pi()
     {
         return Math.PI;
@@ -695,7 +695,7 @@ public final class MathFunctions
     @Description("a cryptographically secure random number between 0 and 1 (exclusive)")
     @ScalarFunction(value = "secure_random", alias = "secure_rand", deterministic = false)
     @SqlType(StandardTypes.DOUBLE)
-    @ScalarFunctionStats(avgRowSize = 8.0, nullFraction = 0.0)
+    @ScalarFunctionConstantStats(avgRowSize = 8.0, nullFraction = 0.0)
     public static double secure_random()
     {
         SecureRandom random = SecureRandomGeneration.getNonBlocking();
@@ -729,7 +729,7 @@ public final class MathFunctions
     @Description("a cryptographically secure random number between lower and upper (exclusive)")
     @ScalarFunction(value = "secure_random", alias = "secure_rand", deterministic = false)
     @SqlType(StandardTypes.SMALLINT)
-    @ScalarFunctionStats(avgRowSize = 4.0, nullFraction = 0.0)
+    @ScalarFunctionConstantStats(avgRowSize = 4.0, nullFraction = 0.0)
     public static long secureRandomSmallint(@SqlType(StandardTypes.SMALLINT) long lower, @SqlType(StandardTypes.SMALLINT) long upper)
     {
         checkCondition(lower < upper, INVALID_FUNCTION_ARGUMENT, "upper bound must be greater than lower bound");

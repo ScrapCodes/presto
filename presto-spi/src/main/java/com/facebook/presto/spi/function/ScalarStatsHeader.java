@@ -17,12 +17,12 @@ import java.util.Map;
 
 public class ScalarStatsHeader
 {
-    private Map<Integer, ScalarTypeStats> statsResolver;
+    private Map<Integer, ScalarPropagateSourceStats> statsResolver;
     private double distinctValuesCount;
     private double nullFraction;
     private double avgRowSize;
 
-    private ScalarStatsHeader(Map<Integer, ScalarTypeStats> statsResolver, double distinctValuesCount, double nullFraction, double avgRowSize)
+    private ScalarStatsHeader(Map<Integer, ScalarPropagateSourceStats> statsResolver, double distinctValuesCount, double nullFraction, double avgRowSize)
     {
         this.statsResolver = statsResolver;
         this.distinctValuesCount = distinctValuesCount;
@@ -30,9 +30,14 @@ public class ScalarStatsHeader
         this.avgRowSize = avgRowSize;
     }
 
-    public ScalarStatsHeader(ScalarFunctionStats statsHeader, Map<Integer, ScalarTypeStats> statsResolver)
+    public ScalarStatsHeader(ScalarFunctionConstantStats statsHeader, Map<Integer, ScalarPropagateSourceStats> statsResolver)
     {
         this(statsResolver, statsHeader.distinctValuesCount(), statsHeader.nullFraction(), statsHeader.avgRowSize());
+    }
+
+    public ScalarStatsHeader(Map<Integer, ScalarPropagateSourceStats> statsResolver)
+    {
+        this(statsResolver, Double.NaN, Double.NaN, Double.NaN);
     }
 
     public double getAvgRowSize()
@@ -50,7 +55,7 @@ public class ScalarStatsHeader
         return distinctValuesCount;
     }
 
-    public Map<Integer, ScalarTypeStats> getStatsResolver()
+    public Map<Integer, ScalarPropagateSourceStats> getStatsResolver()
     {
         return statsResolver;
     }

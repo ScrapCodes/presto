@@ -28,23 +28,13 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * Use this annotation to provide information regarding how this function impacts following query statistics.
  * <p>
  * A function may take one or more input column or a constant as parameters. Precise stats may depend on the input
- * parameters. This annotation does not cover all the possible cases.
+ * parameters. This annotation does not cover all the possible cases and allows constant values for the following fields.
+ * Value Double.NaN implies unknown.
  * </p>
- * <ul>
- * <li>
- * 1. Provide adjustment factor for computing `nullFraction` and `avgRowSize`. These adjustment factor will be
- * applied to input columns on which this function operates on. 1.0 is the default value indicating
- * Propagate input columns stats as is.
- * </li>
- * <li>
- * 2. How to estimate number of distinct values. Does this function produces an intersection of
- * Distinct value counts of each `input column param` or a union.
- * </li>
- * </ul>
  */
 @Retention(RUNTIME)
 @Target(METHOD)
-public @interface ScalarFunctionStats
+public @interface ScalarFunctionConstantStats
 {
     // Min max value is NaN if unknown.
     double minValue() default Double.NaN;
@@ -54,7 +44,6 @@ public @interface ScalarFunctionStats
     HistogramTypes histogram() default HistogramTypes.UNKNOWN;
 
     /**
-     * Distinct values count is another important statistic in measuring query perf characteristics,
      * Does this function produces a constant Distinct value count regardless of `input column`'s source stats.
      */
     double distinctValuesCount() default Double.NaN;
