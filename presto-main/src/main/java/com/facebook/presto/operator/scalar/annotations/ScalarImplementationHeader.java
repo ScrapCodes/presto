@@ -17,10 +17,10 @@ import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.operator.scalar.ScalarHeader;
 import com.facebook.presto.spi.function.ScalarFunction;
-import com.facebook.presto.spi.function.ScalarFunctionStats;
+import com.facebook.presto.spi.function.ScalarFunctionConstantStats;
 import com.facebook.presto.spi.function.ScalarOperator;
+import com.facebook.presto.spi.function.ScalarPropagateSourceStats;
 import com.facebook.presto.spi.function.ScalarStatsHeader;
-import com.facebook.presto.spi.function.ScalarTypeStats;
 import com.facebook.presto.spi.function.SqlFunctionVisibility;
 import com.google.common.collect.ImmutableList;
 
@@ -81,19 +81,22 @@ public class ScalarImplementationHeader
     {
         ScalarFunction scalarFunction = annotated.getAnnotation(ScalarFunction.class);
         ScalarOperator scalarOperator = annotated.getAnnotation(ScalarOperator.class);
-        ScalarFunctionStats statsCalculator = annotated.getAnnotation(ScalarFunctionStats.class);
+        ScalarFunctionConstantStats statsCalculator = annotated.getAnnotation(ScalarFunctionConstantStats.class);
         Optional<String> description = parseDescription(annotated);
         Optional<ScalarStatsHeader> scalarStatsHeader = Optional.empty();
         ImmutableList.Builder<ScalarImplementationHeader> builder = ImmutableList.builder();
-        if (statsCalculator != null) {
-            if (annotated instanceof Method) {
-                System.out.println("Annotated: " + annotated);
-                java.lang.reflect.Parameter[] params = ((Method) annotated).getParameters();
-                Map<Integer, ScalarTypeStats> paramsStats = new HashMap<>();
-                IntStream.range(0, params.length).filter(x -> params[x] != null).forEachOrdered(x -> paramsStats.put(x, params[x].getAnnotation(ScalarTypeStats.class)));
-                scalarStatsHeader = Optional.ofNullable(statsCalculator).map(x -> new ScalarStatsHeader(x, paramsStats));
+        if (annotated instanceof Method) {
+            System.out.println("Annotated: " + annotated);
+            java.lang.reflect.Parameter[] params = ((Method) annotated).getParameters();
+            Map<Integer, ScalarPropagateSourceStats> paramsStats = new HashMap<>();
+            IntStream.range(0, params.length).filter(x -> params[x].getAnnotation(ScalarPropagateSourceStats.class) != null)
+                    .forEachOrdered(x -> paramsStats.put(x, params[x].getAnnotation(ScalarPropagateSourceStats.class)));
+            scalarStatsHeader = Optional.ofNullable(statsCalculator).map(x -> new ScalarStatsHeader(x, paramsStats));
+            if (!paramsStats.isEmpty() && !scalarStatsHeader.isPresent()) {
+                scalarStatsHeader = Optional.of(new ScalarStatsHeader(paramsStats));
             }
         }
+
         if (scalarFunction != null) {
             String baseName = scalarFunction.value().isEmpty() ? camelToSnake(annotatedName(annotated)) : scalarFunction.value();
             builder.add(new ScalarImplementationHeader(baseName, new ScalarHeader(description, scalarFunction.visibility(), scalarFunction.deterministic(),

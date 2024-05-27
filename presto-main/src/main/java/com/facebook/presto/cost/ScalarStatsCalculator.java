@@ -22,8 +22,8 @@ import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.function.PropagateSourceStats;
+import com.facebook.presto.spi.function.ScalarPropagateSourceStats;
 import com.facebook.presto.spi.function.ScalarStatsHeader;
-import com.facebook.presto.spi.function.ScalarTypeStats;
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.ConstantExpression;
 import com.facebook.presto.spi.relation.InputReferenceExpression;
@@ -70,7 +70,9 @@ import static com.facebook.presto.sql.relational.Expressions.isNull;
 import static com.facebook.presto.util.MoreMath.max;
 import static com.facebook.presto.util.MoreMath.min;
 import static com.google.common.base.Preconditions.checkState;
+import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.NaN;
+import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Double.isFinite;
 import static java.lang.Double.isNaN;
 import static java.lang.Math.abs;
@@ -279,20 +281,28 @@ public class ScalarStatsCalculator
             double avgRowSize = sourceStatsSum.getAverageRowSize();
             double distinctValuesCount = sourceStatsSum.getDistinctValuesCount();
             // TODO: handle histograms.
-            for (Map.Entry<Integer, ScalarTypeStats> entry : statsHeader.getStatsResolver().entrySet()) {
-                ScalarTypeStats scalarTypeStats = entry.getValue();
+            for (Map.Entry<Integer, ScalarPropagateSourceStats> entry : statsHeader.getStatsResolver().entrySet()) {
+                ScalarPropagateSourceStats scalarPropagateSourceStats = entry.getValue();
+                if (scalarPropagateSourceStats.propagateAllStats()) {
+                    VariableStatsEstimate sourceStats = call.getArguments().get(entry.getKey()).accept(this, context);
+                    distinctValuesCount = sourceStats.getDistinctValuesCount();
+                    min = sourceStats.getLowValue();
+                    max = sourceStats.getHighValue();
+                    avgRowSize = sourceStats.getAverageRowSize();
+                    nullFraction = sourceStats.getNullsFraction();
+                }
                 // distinct value count
-                switch (scalarTypeStats.distinctValueCount()) {
+                switch (scalarPropagateSourceStats.distinctValueCount()) {
                     case SOURCE_STATS:
                         VariableStatsEstimate sourceStats = call.getArguments().get(entry.getKey()).accept(this, context);
                         distinctValuesCount = sourceStats.getDistinctValuesCount();
                         break;
                     case MAX:
                     case SUM:
-                        statisticRange = processDistinctValueCountAndRange(call, context, scalarTypeStats.distinctValueCount());
+                        statisticRange = processDistinctValueCountAndRange(call, context, scalarPropagateSourceStats.distinctValueCount());
                 }
                 // min, max can be estimated by distinct value count as well, but user provided hints/values override those.
-                switch (scalarTypeStats.minMaxValue()) {
+                switch (scalarPropagateSourceStats.minMaxValue()) {
                     case SOURCE_STATS:
                         VariableStatsEstimate sourceStats = call.getArguments().get(entry.getKey()).accept(this, context);
                         min = sourceStats.getLowValue();
@@ -303,24 +313,24 @@ public class ScalarStatsCalculator
                         throw new UnsupportedOperationException();
                 }
                 // Average row size
-                switch (scalarTypeStats.avgRowSize()) {
+                switch (scalarPropagateSourceStats.avgRowSize()) {
                     case SOURCE_STATS:
                         VariableStatsEstimate sourceStats = call.getArguments().get(entry.getKey()).accept(this, context);
                         avgRowSize = sourceStats.getAverageRowSize();
                         break;
                     case MAX:
                     case SUM:
-                        avgRowSize = processAvgRowSize(call, context, scalarTypeStats.avgRowSize());
+                        avgRowSize = processAvgRowSize(call, context, scalarPropagateSourceStats.avgRowSize());
                 }
                 // Null fraction
-                switch (scalarTypeStats.nullFraction()) {
+                switch (scalarPropagateSourceStats.nullFraction()) {
                     case SOURCE_STATS:
                         VariableStatsEstimate sourceStats = call.getArguments().get(entry.getKey()).accept(this, context);
-                        avgRowSize = sourceStats.getNullsFraction();
+                        nullFraction = sourceStats.getNullsFraction();
                         break;
                     case MAX:
                     case SUM:
-                        nullFraction = processNullFraction(call, context, scalarTypeStats.nullFraction());
+                        nullFraction = processNullFraction(call, context, scalarPropagateSourceStats.nullFraction());
                 }
             }
 
@@ -333,7 +343,7 @@ public class ScalarStatsCalculator
             if (!isNaN(statsHeader.getDistinctValuesCount())) {
                 distinctValuesCount = statsHeader.getDistinctValuesCount();
             }
-            if (!isNaN(min) && !isNaN(max)) {
+            if (!isNaN(min) && !isNaN(max) && min != NEGATIVE_INFINITY && max != POSITIVE_INFINITY) {
                 statisticRange = new StatisticRange(min, max, distinctValuesCount);
             }
             sourceStatsSum = VariableStatsEstimate.builder().setStatisticsRange(statisticRange)
