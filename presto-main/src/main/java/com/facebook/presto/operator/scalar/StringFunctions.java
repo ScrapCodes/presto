@@ -45,7 +45,6 @@ import static com.facebook.presto.common.type.Chars.trimTrailingSpaces;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.function.PropagateSourceStats.MAX;
-import static com.facebook.presto.spi.function.PropagateSourceStats.SOURCE_STATS;
 import static com.facebook.presto.spi.function.PropagateSourceStats.SUM;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.SliceUtf8.countCodePoints;
@@ -113,7 +112,9 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType("varchar(x)")
-    public static Slice replace(@SqlType("varchar(x)") Slice str, @SqlType("varchar(y)") Slice search)
+    public static Slice replace(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("varchar(x)") Slice str,
+            @SqlType("varchar(y)") Slice search)
     {
         return replace(str, search, Slices.EMPTY_SLICE);
     }
@@ -199,7 +200,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
-    public static Slice reverse(@SqlType("varchar(x)") Slice slice)
+    public static Slice reverse(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("varchar(x)") Slice slice)
     {
         return SliceUtf8.reverse(slice);
     }
@@ -648,8 +649,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
-    @ScalarFunctionStatsCalculator(propagateStats = true)
-    public static Slice lower(@SqlType("varchar(x)") Slice slice)
+    public static Slice lower(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("varchar(x)") Slice slice)
     {
         return toLowerCase(slice);
     }
@@ -658,8 +658,7 @@ public final class StringFunctions
     @ScalarFunction("lower")
     @LiteralParameters("x")
     @SqlType("char(x)")
-    @ScalarFunctionStatsCalculator(propagateStats = true)
-    public static Slice charLower(@SqlType("char(x)") Slice slice)
+    public static Slice charLower(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("char(x)") Slice slice)
     {
         return lower(slice);
     }
@@ -752,7 +751,10 @@ public final class StringFunctions
     @ScalarFunction("rpad")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.VARCHAR)
-    public static Slice rightPad(@SqlType("varchar(x)") Slice text, @SqlType(StandardTypes.BIGINT) long targetLength, @SqlType("varchar(y)") Slice padString)
+    public static Slice rightPad(
+            @ScalarPropagateSourceStats(propagateAllStats = true, avgRowSize = SUM) @SqlType("varchar(x)") Slice text,
+            @SqlType(StandardTypes.BIGINT) long targetLength,
+            @SqlType("varchar(y)") Slice padString)
     {
         return pad(text, targetLength, padString, text.length());
     }
@@ -893,7 +895,9 @@ public final class StringFunctions
     @Description("decodes the UTF-8 encoded string")
     @ScalarFunction
     @SqlType(StandardTypes.VARCHAR)
-    public static Slice fromUtf8(@SqlType(StandardTypes.VARBINARY) Slice slice, @SqlType(StandardTypes.BIGINT) long replacementCodePoint)
+    public static Slice fromUtf8(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.VARBINARY) Slice slice,
+            @SqlType(StandardTypes.BIGINT) long replacementCodePoint)
     {
         if (replacementCodePoint > MAX_CODE_POINT || Character.getType((int) replacementCodePoint) == SURROGATE) {
             throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Invalid replacement character");
@@ -916,9 +920,8 @@ public final class StringFunctions
     @LiteralParameters({"x", "y", "u"})
     @Constraint(variable = "u", expression = "x + y")
     @SqlType("char(u)")
-    @ScalarFunctionConstantStats
     public static Slice concat(@LiteralParameter("x") Long x,
-            @ScalarPropagateSourceStats(distinctValueCount = SUM, nullFraction = SOURCE_STATS, avgRowSize = SUM) @SqlType("char(x)") Slice left,
+            @ScalarPropagateSourceStats(propagateAllStats = true, avgRowSize = SUM) @SqlType("char(x)") Slice left,
             @SqlType("char(y)") Slice right)
     {
         int rightLength = right.length();
@@ -941,6 +944,7 @@ public final class StringFunctions
     @ScalarFunction("starts_with")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BOOLEAN)
+    @ScalarFunctionConstantStats(avgRowSize = 1, distinctValuesCount = 2, nullFraction = 0)
     public static Boolean startsWith(@SqlType("varchar(x)") Slice x, @SqlType("varchar(y)") Slice y)
     {
         if (x.length() < y.length()) {
@@ -955,6 +959,7 @@ public final class StringFunctions
     @ScalarFunction("ends_with")
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BOOLEAN)
+    @ScalarFunctionConstantStats(avgRowSize = 1, distinctValuesCount = 2, nullFraction = 0)
     public static Boolean endsWith(@SqlType("varchar(x)") Slice x, @SqlType("varchar(y)") Slice y)
     {
         if (x.length() < y.length()) {
