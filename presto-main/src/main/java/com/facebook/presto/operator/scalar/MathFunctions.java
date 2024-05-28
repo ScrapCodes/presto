@@ -24,6 +24,7 @@ import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
 import com.facebook.presto.spi.function.ScalarFunctionConstantStats;
+import com.facebook.presto.spi.function.ScalarPropagateSourceStats;
 import com.facebook.presto.spi.function.Signature;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
@@ -1014,7 +1015,7 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction("round")
     @SqlType(StandardTypes.TINYINT)
-    public static long roundTinyint(@SqlType(StandardTypes.TINYINT) long num)
+    public static long roundTinyint(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.TINYINT) long num)
     {
         return num;
     }
@@ -1022,7 +1023,7 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction("round")
     @SqlType(StandardTypes.SMALLINT)
-    public static long roundSmallint(@SqlType(StandardTypes.SMALLINT) long num)
+    public static long roundSmallint(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.SMALLINT) long num)
     {
         return num;
     }
@@ -1030,7 +1031,7 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction("round")
     @SqlType(StandardTypes.INTEGER)
-    public static long roundInteger(@SqlType(StandardTypes.INTEGER) long num)
+    public static long roundInteger(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.INTEGER) long num)
     {
         return num;
     }
@@ -1038,7 +1039,7 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction
     @SqlType(StandardTypes.BIGINT)
-    public static long round(@SqlType(StandardTypes.BIGINT) long num)
+    public static long round(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.BIGINT) long num)
     {
         return num;
     }
@@ -1046,7 +1047,8 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction("round")
     @SqlType(StandardTypes.TINYINT)
-    public static long roundTinyint(@SqlType(StandardTypes.TINYINT) long num, @SqlType(StandardTypes.INTEGER) long decimals)
+    public static long roundTinyint(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.TINYINT) long num, @SqlType(StandardTypes.INTEGER) long decimals)
     {
         // TODO implement support for `decimals < 0`
         return num;
@@ -1055,7 +1057,8 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction("round")
     @SqlType(StandardTypes.SMALLINT)
-    public static long roundSmallint(@SqlType(StandardTypes.SMALLINT) long num, @SqlType(StandardTypes.INTEGER) long decimals)
+    public static long roundSmallint(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.SMALLINT) long num, @SqlType(StandardTypes.INTEGER) long decimals)
     {
         // TODO implement support for `decimals < 0`
         return num;
@@ -1064,7 +1067,8 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction("round")
     @SqlType(StandardTypes.INTEGER)
-    public static long roundInteger(@SqlType(StandardTypes.INTEGER) long num, @SqlType(StandardTypes.INTEGER) long decimals)
+    public static long roundInteger(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.INTEGER) long num, @SqlType(StandardTypes.INTEGER) long decimals)
     {
         // TODO implement support for `decimals < 0`
         return num;
@@ -1073,7 +1077,8 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction
     @SqlType(StandardTypes.BIGINT)
-    public static long round(@SqlType(StandardTypes.BIGINT) long num, @SqlType(StandardTypes.INTEGER) long decimals)
+    public static long round(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.BIGINT) long num, @SqlType(StandardTypes.INTEGER) long decimals)
     {
         // TODO implement support for `decimals < 0`
         return num;
@@ -1082,7 +1087,8 @@ public final class MathFunctions
     @Description("round to nearest integer")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    public static double round(@SqlType(StandardTypes.DOUBLE) double num)
+    public static double round(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.DOUBLE) double num)
     {
         return round(num, 0);
     }
@@ -1090,7 +1096,8 @@ public final class MathFunctions
     @Description("round to given number of decimal places")
     @ScalarFunction("round")
     @SqlType(StandardTypes.REAL)
-    public static long roundFloat(@SqlType(StandardTypes.REAL) long num)
+    public static long roundFloat(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.REAL) long num)
     {
         return roundFloat(num, 0);
     }
@@ -1098,7 +1105,9 @@ public final class MathFunctions
     @Description("round to given number of decimal places")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    public static double round(@SqlType(StandardTypes.DOUBLE) double num, @SqlType(StandardTypes.INTEGER) long decimals)
+    public static double round(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.DOUBLE) double num,
+            @SqlType(StandardTypes.INTEGER) long decimals)
     {
         if (Double.isNaN(num) || Double.isInfinite(num)) {
             return num;
@@ -1115,7 +1124,9 @@ public final class MathFunctions
     @Description("round to given number of decimal places")
     @ScalarFunction("round")
     @SqlType(StandardTypes.REAL)
-    public static long roundFloat(@SqlType(StandardTypes.REAL) long num, @SqlType(StandardTypes.INTEGER) long decimals)
+    public static long roundFloat(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.REAL) long num,
+            @SqlType(StandardTypes.INTEGER) long decimals)
     {
         float numInFloat = intBitsToFloat((int) num);
         if (Float.isNaN(numInFloat) || Float.isInfinite(numInFloat)) {
@@ -1140,7 +1151,9 @@ public final class MathFunctions
         @SqlType("decimal(rp, rs)")
         @Constraint(variable = "rp", expression = "min(38, p - s + min(1, s))")
         @Constraint(variable = "rs", expression = "0")
-        public static long roundShort(@LiteralParameter("s") long numScale, @SqlType("decimal(p, s)") long num)
+        public static long roundShort(
+                @LiteralParameter("s") long numScale,
+                @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("decimal(p, s)") long num)
         {
             if (num == 0) {
                 return 0;
@@ -1163,7 +1176,9 @@ public final class MathFunctions
         @SqlType("decimal(rp, rs)")
         @Constraint(variable = "rp", expression = "min(38, p - s + min(1, s))")
         @Constraint(variable = "rs", expression = "0")
-        public static Slice roundLongLong(@LiteralParameter("s") long numScale, @SqlType("decimal(p, s)") Slice num)
+        public static Slice roundLongLong(
+                @LiteralParameter("s") long numScale,
+                @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("decimal(p, s)") Slice num)
         {
             if (numScale == 0) {
                 return num;
@@ -1175,7 +1190,9 @@ public final class MathFunctions
         @SqlType("decimal(rp, rs)")
         @Constraint(variable = "rp", expression = "min(38, p - s + min(1, s))")
         @Constraint(variable = "rs", expression = "0")
-        public static long roundLongShort(@LiteralParameter("s") long numScale, @SqlType("decimal(p, s)") Slice num)
+        public static long roundLongShort(
+                @LiteralParameter("s") long numScale,
+                @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("decimal(p, s)") Slice num)
         {
             return unscaledDecimalToUnscaledLong(rescale(num, -(int) numScale));
         }
@@ -1191,7 +1208,7 @@ public final class MathFunctions
         public static long roundNShort(
                 @LiteralParameter("p") long numPrecision,
                 @LiteralParameter("s") long numScale,
-                @SqlType("decimal(p, s)") long num,
+                @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("decimal(p, s)") long num,
                 @SqlType(StandardTypes.INTEGER) long decimals)
         {
             if (num == 0 || numPrecision - numScale + decimals <= 0) {
