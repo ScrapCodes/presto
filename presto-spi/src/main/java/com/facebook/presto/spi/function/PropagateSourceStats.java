@@ -18,5 +18,7 @@ public enum PropagateSourceStats
     MAX,
     SUM,
     SOURCE_STATS,
+    ROW_COUNT,
+    MAX_TYPE_WIDTH,
     UNKNOWN,
 }

@@ -65,6 +65,8 @@ import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.function.FunctionKind.SCALAR;
+import static com.facebook.presto.spi.function.PropagateSourceStats.ROW_COUNT;
+import static com.facebook.presto.spi.function.PropagateSourceStats.SOURCE_STATS;
 import static com.facebook.presto.type.DecimalOperators.modulusScalarFunction;
 import static com.facebook.presto.type.DecimalOperators.modulusSignatureBuilder;
 import static com.facebook.presto.util.Failures.checkCondition;
@@ -660,7 +662,8 @@ public final class MathFunctions
     @Description("a pseudo-random number between 0 and value (exclusive)")
     @ScalarFunction(value = "random", alias = "rand", deterministic = false)
     @SqlType(StandardTypes.TINYINT)
-    public static long randomTinyint(@SqlType(StandardTypes.TINYINT) long value)
+    @ScalarFunctionConstantStats(avgRowSize = 4, nullFraction = 0.0, minValue = 0.0, maxValue = Integer.MAX_VALUE)
+    public static long randomTinyint(@ScalarPropagateSourceStats(distinctValueCount = ROW_COUNT) @SqlType(StandardTypes.TINYINT) long value)
     {
         checkCondition(value > 0, INVALID_FUNCTION_ARGUMENT, "bound must be positive");
         return ThreadLocalRandom.current().nextInt((int) value);
@@ -669,7 +672,8 @@ public final class MathFunctions
     @Description("a pseudo-random number between 0 and value (exclusive)")
     @ScalarFunction(value = "random", alias = "rand", deterministic = false)
     @SqlType(StandardTypes.SMALLINT)
-    public static long randomSmallint(@SqlType(StandardTypes.SMALLINT) long value)
+    @ScalarFunctionConstantStats(avgRowSize = 4, nullFraction = 0.0, minValue = 0.0, maxValue = Integer.MAX_VALUE)
+    public static long randomSmallint(@ScalarPropagateSourceStats(distinctValueCount = ROW_COUNT) @SqlType(StandardTypes.SMALLINT) long value)
     {
         checkCondition(value > 0, INVALID_FUNCTION_ARGUMENT, "bound must be positive");
         return ThreadLocalRandom.current().nextInt((int) value);
@@ -678,7 +682,8 @@ public final class MathFunctions
     @Description("a pseudo-random number between 0 and value (exclusive)")
     @ScalarFunction(value = "random", alias = "rand", deterministic = false)
     @SqlType(StandardTypes.INTEGER)
-    public static long randomInteger(@SqlType(StandardTypes.INTEGER) long value)
+    @ScalarFunctionConstantStats(avgRowSize = 4, nullFraction = 0.0, minValue = 0.0, maxValue = Integer.MAX_VALUE)
+    public static long randomInteger(@ScalarPropagateSourceStats(distinctValueCount = ROW_COUNT) @SqlType(StandardTypes.INTEGER) long value)
     {
         checkCondition(value > 0, INVALID_FUNCTION_ARGUMENT, "bound must be positive");
         return ThreadLocalRandom.current().nextInt((int) value);
@@ -687,7 +692,8 @@ public final class MathFunctions
     @Description("a pseudo-random number between 0 and value (exclusive)")
     @ScalarFunction(alias = "rand", deterministic = false)
     @SqlType(StandardTypes.BIGINT)
-    public static long random(@SqlType(StandardTypes.BIGINT) long value)
+    @ScalarFunctionConstantStats(avgRowSize = 8, nullFraction = 0.0, minValue = 0.0, maxValue = Long.MAX_VALUE)
+    public static long random(@ScalarPropagateSourceStats(distinctValueCount = ROW_COUNT) @SqlType(StandardTypes.BIGINT) long value)
     {
         checkCondition(value > 0, INVALID_FUNCTION_ARGUMENT, "bound must be positive");
         return ThreadLocalRandom.current().nextLong(value);
@@ -696,7 +702,7 @@ public final class MathFunctions
     @Description("a cryptographically secure random number between 0 and 1 (exclusive)")
     @ScalarFunction(value = "secure_random", alias = "secure_rand", deterministic = false)
     @SqlType(StandardTypes.DOUBLE)
-    @ScalarFunctionConstantStats(avgRowSize = 8.0, nullFraction = 0.0)
+    @ScalarFunctionConstantStats(avgRowSize = 8.0, nullFraction = 0.0, minValue = 0.0, maxValue = 1.0)
     public static double secure_random()
     {
         SecureRandom random = SecureRandomGeneration.getNonBlocking();
@@ -706,7 +712,10 @@ public final class MathFunctions
     @Description("a cryptographically secure random number between lower and upper (exclusive)")
     @ScalarFunction(value = "secure_random", alias = "secure_rand", deterministic = false)
     @SqlType(StandardTypes.DOUBLE)
-    public static double secure_random(@SqlType(StandardTypes.DOUBLE) double lower, @SqlType(StandardTypes.DOUBLE) double upper)
+    @ScalarFunctionConstantStats(avgRowSize = 8, nullFraction = 0.0)
+    public static double secure_random(
+            @ScalarPropagateSourceStats(minMaxValue = SOURCE_STATS, distinctValueCount = ROW_COUNT) @SqlType(StandardTypes.DOUBLE) double lower,
+            @SqlType(StandardTypes.DOUBLE) double upper)
     {
         checkCondition(lower < upper, INVALID_FUNCTION_ARGUMENT, "upper bound must be greater than lower bound");
         SecureRandom random = SecureRandomGeneration.getNonBlocking();
@@ -718,7 +727,10 @@ public final class MathFunctions
     @Description("a cryptographically secure random number between lower and upper (exclusive)")
     @ScalarFunction(value = "secure_random", alias = "secure_rand", deterministic = false)
     @SqlType(StandardTypes.TINYINT)
-    public static long secureRandomTinyint(@SqlType(StandardTypes.TINYINT) long lower, @SqlType(StandardTypes.TINYINT) long upper)
+    @ScalarFunctionConstantStats(avgRowSize = 4, nullFraction = 0.0)
+    public static long secureRandomTinyint(
+            @ScalarPropagateSourceStats(minMaxValue = SOURCE_STATS, distinctValueCount = ROW_COUNT) @SqlType(StandardTypes.TINYINT) long lower,
+            @SqlType(StandardTypes.TINYINT) long upper)
     {
         checkCondition(lower < upper, INVALID_FUNCTION_ARGUMENT, "upper bound must be greater than lower bound");
         SecureRandom random = SecureRandomGeneration.getNonBlocking();
@@ -1093,7 +1105,7 @@ public final class MathFunctions
         return round(num, 0);
     }
 
-    @Description("round to given number of decimal places")
+    @Description("round to nearest integer")
     @ScalarFunction("round")
     @SqlType(StandardTypes.REAL)
     public static long roundFloat(

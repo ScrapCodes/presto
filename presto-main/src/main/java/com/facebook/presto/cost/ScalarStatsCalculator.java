@@ -70,9 +70,7 @@ import static com.facebook.presto.sql.relational.Expressions.isNull;
 import static com.facebook.presto.util.MoreMath.max;
 import static com.facebook.presto.util.MoreMath.min;
 import static com.google.common.base.Preconditions.checkState;
-import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.NaN;
-import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Double.isFinite;
 import static java.lang.Double.isNaN;
 import static java.lang.Math.abs;
@@ -153,10 +151,26 @@ public class ScalarStatsCalculator
             else {
                 System.out.println("Stats not found for func: " + functionMetadata.getName() + " " + call);
             }
-
-            return VariableStatsEstimate.unknown();
+            // by default propagate source stats of first col.
+            return propagateCallSourceStatistics(call, context);
         }
 
+        private VariableStatsEstimate propagateCallSourceStatistics(CallExpression call, Void context)
+        {
+            requireNonNull(call, "call is null");
+            VariableStatsEstimate sourceStatsFinal = VariableStatsEstimate.unknown();
+            for (int i = 0; i < call.getArguments().size(); i++) {
+                VariableStatsEstimate sourceStats = call.getArguments().get(i).accept(this, context);
+                if (!sourceStats.isUnknown()) {
+                    if (sourceStatsFinal.isUnknown()) {
+                        sourceStatsFinal = sourceStats;
+                        break;
+                    }
+                }
+            }
+
+            return sourceStatsFinal;
+        }
         @Override
         public VariableStatsEstimate visitInputReference(InputReferenceExpression reference, Void context)
         {
@@ -297,6 +311,9 @@ public class ScalarStatsCalculator
                         VariableStatsEstimate sourceStats = call.getArguments().get(entry.getKey()).accept(this, context);
                         distinctValuesCount = sourceStats.getDistinctValuesCount();
                         break;
+                    case ROW_COUNT:
+                        distinctValuesCount = input.getOutputRowCount();
+                        break;
                     case MAX:
                     case SUM:
                         statisticRange = processDistinctValueCountAndRange(call, context, scalarPropagateSourceStats.distinctValueCount());
@@ -334,16 +351,16 @@ public class ScalarStatsCalculator
                 }
             }
 
-            if (!isNaN(statsHeader.getNullFraction())) {
+            if (isFinite(statsHeader.getNullFraction())) {
                 nullFraction = statsHeader.getNullFraction();
             }
-            if (!isNaN(statsHeader.getAvgRowSize())) {
+            if (isFinite(statsHeader.getAvgRowSize())) {
                 avgRowSize = statsHeader.getAvgRowSize();
             }
-            if (!isNaN(statsHeader.getDistinctValuesCount())) {
+            if (isFinite(statsHeader.getDistinctValuesCount())) {
                 distinctValuesCount = statsHeader.getDistinctValuesCount();
             }
-            if (!isNaN(min) && !isNaN(max) && min != NEGATIVE_INFINITY && max != POSITIVE_INFINITY) {
+            if (isFinite(min) && isFinite(max)) {
                 statisticRange = new StatisticRange(min, max, distinctValuesCount);
             }
             sourceStatsSum = VariableStatsEstimate.builder().setStatisticsRange(statisticRange)

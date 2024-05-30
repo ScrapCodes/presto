@@ -22,7 +22,6 @@ import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
 import com.facebook.presto.spi.function.ScalarFunctionConstantStats;
-import com.facebook.presto.spi.function.ScalarFunctionStatsCalculator;
 import com.facebook.presto.spi.function.ScalarOperator;
 import com.facebook.presto.spi.function.ScalarPropagateSourceStats;
 import com.facebook.presto.spi.function.SqlNullable;
@@ -45,6 +44,8 @@ import static com.facebook.presto.common.type.Chars.trimTrailingSpaces;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.function.PropagateSourceStats.MAX;
+import static com.facebook.presto.spi.function.PropagateSourceStats.MAX_TYPE_WIDTH;
+import static com.facebook.presto.spi.function.PropagateSourceStats.ROW_COUNT;
 import static com.facebook.presto.spi.function.PropagateSourceStats.SUM;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.SliceUtf8.countCodePoints;
@@ -676,7 +677,6 @@ public final class StringFunctions
     @ScalarFunction("upper")
     @LiteralParameters("x")
     @SqlType("char(x)")
-    @ScalarFunctionStatsCalculator(propagateStats = true)
     public static Slice charUpper(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("char(x)") Slice slice)
     {
         return upper(slice);
@@ -763,7 +763,10 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
-    public static long levenshteinDistance(@SqlType("varchar(x)") Slice left, @SqlType("varchar(y)") Slice right)
+    @ScalarFunctionConstantStats(avgRowSize = 8, minValue = 0, maxValue = Long.MAX_VALUE)
+    public static long levenshteinDistance(
+            @ScalarPropagateSourceStats(propagateAllStats = true, distinctValueCount = MAX_TYPE_WIDTH) @SqlType("varchar(x)") Slice left,
+            @SqlType("varchar(y)") Slice right)
     {
         int[] leftCodePoints = castToCodePoints(left);
         int[] rightCodePoints = castToCodePoints(right);
@@ -815,7 +818,10 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
-    public static long hammingDistance(@SqlType("varchar(x)") Slice left, @SqlType("varchar(y)") Slice right)
+    @ScalarFunctionConstantStats(avgRowSize = 8, minValue = 0, maxValue = Long.MAX_VALUE)
+    public static long hammingDistance(
+            @ScalarPropagateSourceStats(propagateAllStats = true) @SqlType("varchar(x)") Slice left,
+            @SqlType("varchar(y)") Slice right)
     {
         int distance = 0;
         int leftPosition = 0;
@@ -921,7 +927,7 @@ public final class StringFunctions
     @Constraint(variable = "u", expression = "x + y")
     @SqlType("char(u)")
     public static Slice concat(@LiteralParameter("x") Long x,
-            @ScalarPropagateSourceStats(propagateAllStats = true, avgRowSize = SUM) @SqlType("char(x)") Slice left,
+            @ScalarPropagateSourceStats(propagateAllStats = true, avgRowSize = SUM, distinctValueCount = ROW_COUNT) @SqlType("char(x)") Slice left,
             @SqlType("char(y)") Slice right)
     {
         int rightLength = right.length();
