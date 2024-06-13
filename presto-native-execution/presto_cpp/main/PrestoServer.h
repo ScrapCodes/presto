@@ -233,7 +233,7 @@ class PrestoServer {
   // Executor for spilling.
   std::shared_ptr<folly::CPUThreadPoolExecutor> spillerExecutor_;
 
-  std::unique_ptr<http::HttpClientConnectionPool> exchangeSourceConnectionPool_;
+  std::unique_ptr<ConnectionPools> exchangeSourceConnectionPools_;
 
   // If not null,  the instance of AsyncDataCache used for in-memory file cache.
   std::shared_ptr<velox::cache::AsyncDataCache> cache_;
