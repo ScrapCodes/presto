@@ -160,7 +160,7 @@ public class ScalarStatsCalculator
                 return computeCastStatistics(call, context);
             }
 
-            if (call.getDisplayName().equals("concat")) {
+            if (call.getDisplayName().equals("concat") && isStatsPropagationEnabled) {
                 return computeConcatStatistics(call, context);
             }
             if (functionMetadata.getStatsHeader().isPresent() &&
@@ -448,8 +448,8 @@ public class ScalarStatsCalculator
             if (isFinite(min) && isFinite(max)) {
                 statisticRange = new StatisticRange(min, max, distinctValuesCount);
             }
-            if (isFinite(getReturnTypeWidth(call)) && !isFinite(avgRowSize)) {
-                avgRowSize = getReturnTypeWidth(call);
+            if (isFinite(getReturnTypeWidth(call))) {
+                avgRowSize = min(avgRowSize, getReturnTypeWidth(call));
             }
             // Constant values override any values.
             if (isFinite(statsHeader.getNullFraction())) {
