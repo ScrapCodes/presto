@@ -59,7 +59,7 @@ public class PlanNodeStatsEstimate
     private final double totalSize;
     private final PMap<VariableReferenceExpression, VariableStatsEstimate> variableStatistics;
 
-    private final SourceInfo sourceInfo;
+    private SourceInfo sourceInfo;
 
     private final JoinNodeStatsEstimate joinNodeStatsEstimate;
 
@@ -109,6 +109,15 @@ public class PlanNodeStatsEstimate
         this.joinNodeStatsEstimate = requireNonNull(joinNodeStatsEstimate, "joinNodeSpecificStatsEstimate is null");
         this.tableWriterNodeStatsEstimate = requireNonNull(tableWriterNodeStatsEstimate, "tableWriterNodeStatsEstimate is null");
         this.partialAggregationStatsEstimate = requireNonNull(partialAggregationStatsEstimate, "partialAggregationStatsEstimate is null");
+    }
+
+    // Do not propagate the totalSize by default, because otherwise people have to explicitly set it to NaN or a not NaN but possibly wrong totalSize value is carried.
+    // Given that we are only using this field for "leaf" simple join plans for now, it is safer to set it NaN by default so that if "accidentally" fetch the totalSize
+    // at other places we can tell that it is not usable via isNaN(). Ideally, when we have implemented how to handle the totalSize field for all types of operator rules,
+    // we should propagate totalSize as default to simplify the relevant operations in rules that do not change this field.
+    public static Builder buildFrom(PlanNodeStatsEstimate other)
+    {
+        return new Builder(other.getOutputRowCount(), NaN, other.confidenceLevel(), other.variableStatistics, other.sourceInfo);
     }
 
     /**
@@ -345,13 +354,9 @@ public class PlanNodeStatsEstimate
         return new Builder();
     }
 
-    // Do not propagate the totalSize by default, because otherwise people have to explicitly set it to NaN or a not NaN but possibly wrong totalSize value is carried.
-    // Given that we are only using this field for "leaf" simple join plans for now, it is safer to set it NaN by default so that if "accidentally" fetch the totalSize
-    // at other places we can tell that it is not usable via isNaN(). Ideally, when we have implemented how to handle the totalSize field for all types of operator rules,
-    // we should propagate totalSize as default to simplify the relevant operations in rules that do not change this field.
-    public static Builder buildFrom(PlanNodeStatsEstimate other)
+    public void setSourceInfo(SourceInfo sourceInfo)
     {
-        return new Builder(other.getOutputRowCount(), NaN, other.confidenceLevel(), other.variableStatistics);
+        this.sourceInfo = sourceInfo;
     }
 
     public static final class Builder
@@ -361,19 +366,27 @@ public class PlanNodeStatsEstimate
         private ConfidenceLevel confidenceLevel;
         private PMap<VariableReferenceExpression, VariableStatsEstimate> variableStatistics;
         private PartialAggregationStatsEstimate partialAggregationStatsEstimate;
+        private SourceInfo sourceInfo;
 
         public Builder()
         {
-            this(NaN, NaN, LOW, HashTreePMap.empty());
+            this(NaN, NaN, LOW, HashTreePMap.empty(), new CostBasedSourceInfo(LOW));
         }
 
-        private Builder(double outputRowCount, double totalSize, ConfidenceLevel confidenceLevel, PMap<VariableReferenceExpression, VariableStatsEstimate> variableStatistics)
+        private Builder(double outputRowCount, double totalSize, ConfidenceLevel confidenceLevel, PMap<VariableReferenceExpression, VariableStatsEstimate> variableStatistics, SourceInfo sourceInfo)
         {
             this.outputRowCount = outputRowCount;
             this.totalSize = totalSize;
             this.confidenceLevel = confidenceLevel;
             this.variableStatistics = variableStatistics;
             this.partialAggregationStatsEstimate = PartialAggregationStatsEstimate.unknown();
+            this.sourceInfo = sourceInfo;
+        }
+
+        public Builder setSourceInfo(SourceInfo sourceInfo)
+        {
+            this.sourceInfo = sourceInfo;
+            return this;
         }
 
         public Builder setOutputRowCount(double outputRowCount)
@@ -420,13 +433,15 @@ public class PlanNodeStatsEstimate
 
         public PlanNodeStatsEstimate build()
         {
-            return new PlanNodeStatsEstimate(outputRowCount,
+            PlanNodeStatsEstimate planNodeStatsEstimate = new PlanNodeStatsEstimate(outputRowCount,
                     totalSize,
                     confidenceLevel,
                     variableStatistics,
                     JoinNodeStatsEstimate.unknown(),
                     TableWriterNodeStatsEstimate.unknown(),
                     partialAggregationStatsEstimate);
+            planNodeStatsEstimate.setSourceInfo(sourceInfo);
+            return planNodeStatsEstimate;
         }
     }
 }

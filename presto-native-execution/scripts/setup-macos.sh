@@ -12,6 +12,7 @@
 # limitations under the License.
 
 set -eufx -o pipefail
+set -x
 
 SCRIPTDIR=$(dirname "${BASH_SOURCE[0]}")
 PYTHON_VENV=${PYTHON_VENV:-"${SCRIPTDIR}/../.venv"}

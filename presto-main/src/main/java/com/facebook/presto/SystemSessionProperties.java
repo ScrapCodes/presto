@@ -269,6 +269,7 @@ public final class SystemSessionProperties
     public static final String PREFER_MERGE_JOIN_FOR_SORTED_INPUTS = "prefer_merge_join_for_sorted_inputs";
     public static final String SEGMENTED_AGGREGATION_ENABLED = "segmented_aggregation_enabled";
     public static final String USE_HISTORY_BASED_PLAN_STATISTICS = "use_history_based_plan_statistics";
+    public static final String USE_ML_BASED_STATISTICS = "use_ml_based_statistics";
     public static final String TRACK_HISTORY_BASED_PLAN_STATISTICS = "track_history_based_plan_statistics";
     public static final String TRACK_HISTORY_STATS_FROM_FAILED_QUERIES = "track_history_stats_from_failed_queries";
     public static final String USE_PERFECTLY_CONSISTENT_HISTORIES = "use_perfectly_consistent_histories";
@@ -1550,8 +1551,7 @@ public final class SystemSessionProperties
                         false),
                 booleanProperty(
                         USE_HISTORY_BASED_PLAN_STATISTICS,
-                        "Use history based plan statistics service in query optimizer",
-                        featuresConfig.isUseHistoryBasedPlanStatistics(),
+                        "Use history based plan statistics service in query optimizer", featuresConfig.isUseHistoryBasedPlanStatistics(), false), booleanProperty(USE_ML_BASED_STATISTICS, "Use ML based statistics service in query optimizer", featuresConfig.isUseMLBasedStatistics(),
                         false),
                 booleanProperty(
                         TRACK_HISTORY_BASED_PLAN_STATISTICS,
@@ -3110,6 +3110,11 @@ public final class SystemSessionProperties
     public static boolean isQuickDistinctLimitEnabled(Session session)
     {
         return session.getSystemProperty(QUICK_DISTINCT_LIMIT_ENABLED, Boolean.class);
+    }
+
+    public static boolean useMLBasedStatisticsEnabled(Session session)
+    {
+        return session.getSystemProperty(USE_ML_BASED_STATISTICS, Boolean.class);
     }
 
     public static boolean useHistoryBasedPlanStatisticsEnabled(Session session)

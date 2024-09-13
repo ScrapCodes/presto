@@ -18,6 +18,7 @@ import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.spi.plan.ProjectNode;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
+import com.facebook.presto.spi.statistics.MLBasedSourceInfo;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.spi.statistics.SourceInfo.ConfidenceLevel;
+import static com.facebook.presto.spi.statistics.SourceInfo.ConfidenceLevel.HIGH;
 import static com.facebook.presto.spi.statistics.SourceInfo.ConfidenceLevel.LOW;
 import static com.facebook.presto.sql.planner.plan.Patterns.project;
 import static java.util.Objects.requireNonNull;
@@ -55,9 +57,11 @@ public class ProjectStatsRule
 
         boolean noChange = noChangeToSourceColumns(node);
         ConfidenceLevel newConfidence = noChange ? sourceStats.confidenceLevel() : LOW;
+        if (sourceStats.getSourceInfo() instanceof MLBasedSourceInfo) {
+            newConfidence = HIGH;
+        }
         PlanNodeStatsEstimate.Builder calculatedStats = PlanNodeStatsEstimate.builder()
-                .setOutputRowCount(sourceStats.getOutputRowCount())
-                .setConfidence(newConfidence);
+                .setOutputRowCount(sourceStats.getOutputRowCount()).setConfidence(newConfidence).setSourceInfo(sourceStats.getSourceInfo());
 
         for (Map.Entry<VariableReferenceExpression, RowExpression> entry : node.getAssignments().entrySet()) {
             RowExpression expression = entry.getValue();

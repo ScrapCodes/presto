@@ -74,7 +74,7 @@ public class TestFeaturesConfig
                 .setSpatialJoinsEnabled(true)
                 .setJoinReorderingStrategy(JoinReorderingStrategy.AUTOMATIC)
                 .setPartialMergePushdownStrategy(FeaturesConfig.PartialMergePushdownStrategy.NONE)
-                .setMaxReorderedJoins(9)
+                .setMaxReorderedJoins(9).setUseMLBasedStatistics(false)
                 .setUseHistoryBasedPlanStatistics(false)
                 .setTrackHistoryBasedPlanStatistics(false)
                 .setTrackHistoryStatsFromFailedQuery(true)

@@ -16,8 +16,12 @@ package com.facebook.presto.cost;
 import com.facebook.presto.Session;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.spi.plan.EquiJoinClause;
+import com.facebook.presto.spi.relation.Condition;
+import com.facebook.presto.spi.relation.JoinCondition;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
+import com.facebook.presto.spi.statistics.MLBasedSourceInfo;
+import com.facebook.presto.spi.statistics.SourceInfo;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.JoinNode;
@@ -26,14 +30,19 @@ import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.util.MoreMath;
 import com.google.common.annotations.VisibleForTesting;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.SystemSessionProperties.getDefaultJoinSelectivityCoefficient;
 import static com.facebook.presto.SystemSessionProperties.shouldOptimizerUseHistograms;
+import static com.facebook.presto.SystemSessionProperties.useMLBasedStatisticsEnabled;
 import static com.facebook.presto.cost.DisjointRangeDomainHistogram.addConjunction;
 import static com.facebook.presto.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static com.facebook.presto.cost.VariableStatsEstimate.buildFrom;
@@ -85,10 +94,26 @@ public class JoinStatsRule
     @Override
     protected Optional<PlanNodeStatsEstimate> doCalculate(JoinNode node, StatsProvider sourceStats, Lookup lookup, Session session, TypeProvider types)
     {
+        // traverse the join node to collect all other joins and filters
+        PlanNodeStatsEstimate estimate = PlanNodeStatsEstimate.unknown();
+        if (useMLBasedStatisticsEnabled(session)) {
+            List<Condition> conditions = null;
+            if (sourceStats instanceof CachingStatsProvider) {
+                ConditionExtractor conditionExtractor = new ConditionExtractor(node, lookup);
+                conditions = conditionExtractor.extractConditions();
+            }
+            if (conditions != null) {
+                estimate = joinStatsUsingML(conditions, session.getMlStatsMap());
+            }
+        }
+        if (!estimate.isOutputRowCountUnknown()) {
+            estimate.setSourceInfo(new MLBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
+//            System.out.println(estimate.getOutputRowCount());
+            return Optional.of(estimate);
+        }
         PlanNodeStatsEstimate leftStats = sourceStats.getStats(node.getLeft());
         PlanNodeStatsEstimate rightStats = sourceStats.getStats(node.getRight());
         PlanNodeStatsEstimate crossJoinStats = crossJoinStats(node, leftStats, rightStats);
-
         switch (node.getType()) {
             case INNER:
                 return Optional.of(computeInnerJoinStats(node, crossJoinStats, session, types));
@@ -100,6 +125,40 @@ public class JoinStatsRule
                 return Optional.of(computeFullJoinStats(node, leftStats, rightStats, crossJoinStats, session, types));
             default:
                 throw new IllegalStateException("Unknown join type: " + node.getType());
+        }
+    }
+
+    private PlanNodeStatsEstimate joinStatsUsingML(List<Condition> conditions, Map<Integer, PlanNodeStatsEstimate> mlStatsMap)
+    {
+        PlanNodeStatsEstimate.Builder builder = PlanNodeStatsEstimate.builder();
+        List<String> filterPredicates = new ArrayList<>();
+        List<String> joinPredicates = new ArrayList<>();
+        for (Condition condition : conditions) {
+            if (condition instanceof JoinCondition) {
+                joinPredicates.add(condition.toSQL());
+            }
+            else {
+                filterPredicates.add(condition.toSQL());
+            }
+        }
+        // todo: this assumes that the filter predicates are
+        //  all connected by AND. this joins the different table's filter conditions
+        String filterPredicatesStr = filterPredicates.stream().sorted().collect(Collectors.joining(" AND "));
+        String joinPredicatesStr = joinPredicates.stream().sorted().collect(Collectors.joining(" AND "));
+        Integer hashValue = Objects.hash(filterPredicatesStr, joinPredicatesStr);
+        if (mlStatsMap.containsKey(hashValue)) {
+//            System.out.println("In map: " + filterPredicatesStr + "||" + joinPredicatesStr);
+            return mlStatsMap.get(hashValue);
+        }
+        try {
+            BayesCardPythonCallerAPI request = new BayesCardPythonCallerAPI(filterPredicatesStr, joinPredicatesStr);
+            PlanNodeStatsEstimate estimate = builder.setOutputRowCount(request.callAPI()).build();
+            mlStatsMap.put(hashValue, estimate);
+            return estimate;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return builder.build();
         }
     }
 

@@ -49,4 +49,9 @@ public interface ColumnHandle
     {
         return emptyList();
     }
+
+    default String getName()
+    {
+        return null;
+    }
 }

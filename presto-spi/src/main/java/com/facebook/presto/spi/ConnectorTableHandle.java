@@ -15,4 +15,8 @@ package com.facebook.presto.spi;
 
 public interface ConnectorTableHandle
 {
+    default Object getTableName()
+    {
+        return null;
+    }
 }

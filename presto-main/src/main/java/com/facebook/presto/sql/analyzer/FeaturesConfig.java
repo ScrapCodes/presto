@@ -94,6 +94,7 @@ public class FeaturesConfig
     private boolean cteFilterAndProjectionPushdownEnabled = true;
     private int cteHeuristicReplicationThreshold = 4;
     private int maxReorderedJoins = 9;
+    private boolean useMLBasedStatistics;
     private boolean useHistoryBasedPlanStatistics;
     private boolean trackHistoryBasedPlanStatistics;
     private boolean trackHistoryStatsFromFailedQuery = true;
@@ -769,9 +770,20 @@ public class FeaturesConfig
         return this;
     }
 
+    public boolean isUseMLBasedStatistics()
+    {
+        return useMLBasedStatistics;
+    }
     public boolean isUseHistoryBasedPlanStatistics()
     {
         return useHistoryBasedPlanStatistics;
+    }
+
+    @Config("optimizer.use-ml-based-statistics")
+    public FeaturesConfig setUseMLBasedStatistics(boolean useMLBasedStatistics)
+    {
+        this.useMLBasedStatistics = useMLBasedStatistics;
+        return this;
     }
 
     @Config("optimizer.use-history-based-plan-statistics")

@@ -16,13 +16,21 @@ package com.facebook.presto.cost;
 import com.facebook.presto.Session;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.spi.plan.FilterNode;
+import com.facebook.presto.spi.plan.TableScanNode;
+import com.facebook.presto.spi.relation.Condition;
+import com.facebook.presto.spi.statistics.MLBasedSourceInfo;
+import com.facebook.presto.spi.statistics.SourceInfo;
 import com.facebook.presto.sql.planner.TypeProvider;
+import com.facebook.presto.sql.planner.iterative.GroupReference;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.facebook.presto.SystemSessionProperties.isDefaultFilterFactorEnabled;
+import static com.facebook.presto.SystemSessionProperties.useMLBasedStatisticsEnabled;
 import static com.facebook.presto.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
+import static com.facebook.presto.sql.planner.iterative.Plans.resolveGroupReferences;
 import static com.facebook.presto.sql.planner.plan.Patterns.filter;
 
 public class FilterStatsRule
@@ -47,8 +55,29 @@ public class FilterStatsRule
     @Override
     public Optional<PlanNodeStatsEstimate> doCalculate(FilterNode node, StatsProvider statsProvider, Lookup lookup, Session session, TypeProvider types)
     {
+        // if the source node is a TableScan node, then directly call the Python code to get an estimate of Filter
+        // needs to transfer the filter conditions to strings and get the table name
+        PlanNodeStatsEstimate estimate = PlanNodeStatsEstimate.unknown();
+        if (useMLBasedStatisticsEnabled(session)) {
+            if ((node.getSource() instanceof TableScanNode) || (node.getSource() instanceof GroupReference && resolveGroupReferences(node.getSource(), lookup) instanceof TableScanNode)) {
+//                String table = (((TableScanNode) node.getSource()).getTable().getConnectorHandle()).getTableName().toString();
+                ConditionExtractor conditionExtractor = new ConditionExtractor(node, lookup);
+                List<Condition> conditions = conditionExtractor.extractConditions();
+                if (conditions != null) {
+                    // todo: cause Filter is always pushed down, there should only be one filter condition without join conditions
+                    assert conditions.size() == 1;
+                    estimate = filterStatsCalculator.filterStatsUsingML(conditions.get(0), session.getMlStatsMap());
+                }
+            }
+        }
+
+        if (!estimate.isOutputRowCountUnknown()) {
+            estimate.setSourceInfo(new MLBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
+//            System.out.println(estimate.getOutputRowCount());
+            return Optional.of(estimate);
+        }
         PlanNodeStatsEstimate sourceStats = statsProvider.getStats(node.getSource());
-        PlanNodeStatsEstimate estimate = filterStatsCalculator.filterStats(sourceStats, node.getPredicate(), session);
+        estimate = filterStatsCalculator.filterStats(sourceStats, node.getPredicate(), session);
 
         if (isDefaultFilterFactorEnabled(session) && estimate.isOutputRowCountUnknown()) {
             estimate = sourceStats.mapOutputRowCount(sourceRowCount -> sourceStats.getOutputRowCount() * UNKNOWN_FILTER_COEFFICIENT);

@@ -94,6 +94,7 @@ public class TestHiveEventListenerPlugin
             if (!runningQueries.contains(queryId)) {
                 throw new RuntimeException("Missing create event for query " + queryId);
             }
+            // todo: add write the json to file
             runningQueries.remove(queryId);
         }
 

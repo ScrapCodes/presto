@@ -23,6 +23,7 @@ import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.relation.CallExpression;
+import com.facebook.presto.spi.relation.Condition;
 import com.facebook.presto.spi.relation.ConstantExpression;
 import com.facebook.presto.spi.relation.InputReferenceExpression;
 import com.facebook.presto.spi.relation.LambdaDefinitionExpression;
@@ -63,6 +64,7 @@ import javax.inject.Inject;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 
@@ -150,6 +152,32 @@ public class FilterStatsCalculator
             Session session)
     {
         return filterStats(statsEstimate, predicate, session.toConnectorSession(), session);
+    }
+
+    // todo: for RawExpression's VariableReferenceExpression, also need to traverse the TableScan Node to get the real col name
+    public PlanNodeStatsEstimate filterStatsUsingML(
+            Condition condition, Map<Integer, PlanNodeStatsEstimate> mlStatsMap)
+    {
+        PlanNodeStatsEstimate.Builder builder = PlanNodeStatsEstimate.builder();
+//        RowExpression simplifiedExpression = simplifyExpression(session.toConnectorSession(), predicate);
+//        // todo: calls the python program to pass tableName and predicate sql string
+//        String predicates = simplifiedExpression.toSQL(table);
+        String filterPredicatesStr = condition.toSQL();
+        Integer hashValue = Objects.hash(filterPredicatesStr, null);
+        if (mlStatsMap.containsKey(hashValue)) {
+//            System.out.println("In map: " + filterPredicatesStr);
+            return mlStatsMap.get(hashValue);
+        }
+        try {
+            BayesCardPythonCallerAPI request = new BayesCardPythonCallerAPI(filterPredicatesStr, null);
+            float estimate = request.callAPI();
+            PlanNodeStatsEstimate nodeStatsEstimate = builder.setOutputRowCount(estimate).build();
+            mlStatsMap.put(hashValue, nodeStatsEstimate);
+            return nodeStatsEstimate;
+        }
+        catch (Exception e) {
+            return builder.build();
+        }
     }
 
     private Expression simplifyExpression(Session session, Expression predicate, TypeProvider types)

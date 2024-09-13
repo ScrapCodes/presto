@@ -16,6 +16,7 @@ package com.facebook.presto.cost;
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
 import com.facebook.presto.spi.plan.PlanNode;
+import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.iterative.GroupReference;
 import com.facebook.presto.sql.planner.iterative.Lookup;
@@ -43,6 +44,9 @@ public final class CachingStatsProvider
     private final TypeProvider types;
 
     private final Map<PlanNode, PlanNodeStatsEstimate> cache = new IdentityHashMap<>();
+
+    // todo: the previous cache store node to stats, this new cache store node id to stats
+    private final Map<PlanNodeId, PlanNodeStatsEstimate> newCache = new IdentityHashMap<>();
 
     public CachingStatsProvider(StatsCalculator statsCalculator, Session session, TypeProvider types)
     {
@@ -75,6 +79,9 @@ public final class CachingStatsProvider
             }
 
             PlanNodeStatsEstimate stats = cache.get(node);
+            if (stats == null) {
+                stats = newCache.get(node.getId());
+            }
             if (stats != null) {
                 session.getPlanNodeStatsMap().put(node.getId(), stats);
                 return stats;
@@ -82,6 +89,7 @@ public final class CachingStatsProvider
 
             stats = statsCalculator.calculateStats(node, this, lookup, session, types);
             verify(cache.put(node, stats) == null, "Stats already set");
+            verify(newCache.put(node.getId(), stats) == null, "Stats already set");
             session.getPlanNodeStatsMap().put(node.getId(), stats);
             return stats;
         }
