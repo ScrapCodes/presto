@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @JsonTypeInfo(
@@ -53,6 +54,11 @@ public abstract class RowExpression
     public Optional<SourceLocation> getSourceLocation()
     {
         return sourceLocation;
+    }
+
+    public String toSQL(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    {
+        return null;
     }
 
     public abstract Type getType();

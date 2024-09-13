@@ -23,10 +23,17 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.common.function.OperatorType.EQUAL;
+import static com.facebook.presto.common.function.OperatorType.GREATER_THAN;
+import static com.facebook.presto.common.function.OperatorType.GREATER_THAN_OR_EQUAL;
+import static com.facebook.presto.common.function.OperatorType.LESS_THAN;
+import static com.facebook.presto.common.function.OperatorType.LESS_THAN_OR_EQUAL;
+import static com.facebook.presto.common.function.OperatorType.NOT_EQUAL;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
@@ -104,6 +111,56 @@ public final class CallExpression
     public String toString()
     {
         return displayName + "(" + String.join(", ", arguments.stream().map(RowExpression::toString).collect(Collectors.toList())) + ")";
+    }
+
+    @Override
+    public String toSQL(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    {
+        // TODO: the first argument is rowexpression, not column name
+        // TODO: for now, assume it is a binary comparison
+        String ope = null;
+        assert arguments.size() == 2;
+        // TODO: add more operator type
+        if (displayName.equals(EQUAL.name())) {
+            ope = EQUAL.getOperator();
+        }
+        else if (displayName.equals(GREATER_THAN_OR_EQUAL.name())) {
+            ope = GREATER_THAN_OR_EQUAL.getOperator();
+        }
+        else if (displayName.equals(GREATER_THAN.name())) {
+            ope = GREATER_THAN.getOperator();
+        }
+        else if (displayName.equals(LESS_THAN_OR_EQUAL.name())) {
+            ope = LESS_THAN_OR_EQUAL.getOperator();
+        }
+        else if (displayName.equals(LESS_THAN.name())) {
+            ope = LESS_THAN.getOperator();
+        }
+        else if (displayName.equals(NOT_EQUAL.name())) {
+            ope = NOT_EQUAL.getOperator();
+        }
+        if (ope != null) {
+            String leftOperand = null;
+            String rightOperand = null;
+            RowExpression leftExpression = arguments.get(0);
+            RowExpression rightExpression = arguments.get(1);
+            if (leftExpression instanceof VariableReferenceExpression && aliasToColumnMap.containsKey(leftExpression)) {
+                leftOperand = aliasToColumnMap.get(leftExpression);
+            }
+            if (leftExpression instanceof ConstantExpression) {
+                leftOperand = leftExpression.toString();
+            }
+            if (rightExpression instanceof VariableReferenceExpression && aliasToColumnMap.containsKey(rightExpression)) {
+                rightOperand = aliasToColumnMap.get(rightExpression);
+            }
+            if (rightExpression instanceof ConstantExpression) {
+                rightOperand = rightExpression.toString();
+            }
+            if (leftExpression != null && rightExpression != null) {
+                return leftOperand + ope + rightOperand;
+            }
+        }
+        return null;
     }
 
     @Override

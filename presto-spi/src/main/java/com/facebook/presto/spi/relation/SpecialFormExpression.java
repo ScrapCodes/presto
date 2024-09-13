@@ -22,9 +22,13 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
+import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.AND;
+import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.OR;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -131,6 +135,29 @@ public class SpecialFormExpression
     public RowExpression canonicalize()
     {
         return getSourceLocation().isPresent() ? new SpecialFormExpression(Optional.empty(), form, returnType, arguments) : this;
+    }
+
+    @Override
+    public String toSQL(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    // todo: make sure the filter conditions are sorted in order
+    {
+        // for arguments: use form to combine all the arguments, recursively transform the argument to sql: if the argument is a
+        // callexpression, directly rewrite, however, if it is a Special form, recursively call the toSQL
+        // todo: should return null once a component returns null
+        if ((form.equals(OR)) || form.equals(AND)) {
+            return arguments.stream().map(arg -> {
+                if (arg instanceof CallExpression) {
+                    return arg.toSQL(aliasToColumnMap); // Directly call toSQL on CallExpression
+                }
+                else if (arg instanceof SpecialFormExpression) {
+                    return "(" + arg.toSQL(aliasToColumnMap) + ")"; // Recursively call toSQL on SpecialFormExpression
+                }
+                else {
+                    throw new UnsupportedOperationException("Unknown RowExpression type: " + arg.getClass());
+                }
+            }).sorted().collect(Collectors.joining(" " + form.name() + " "));
+        }
+        return null;
     }
 
     public enum Form
