@@ -23,6 +23,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.ScalarPropagateSourceStats;
 import com.facebook.presto.spi.function.Signature;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
@@ -63,6 +64,7 @@ import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.function.FunctionKind.SCALAR;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.USE_SOURCE_STATS;
 import static com.facebook.presto.type.DecimalOperators.modulusScalarFunction;
 import static com.facebook.presto.type.DecimalOperators.modulusSignatureBuilder;
 import static com.facebook.presto.util.Failures.checkCondition;
@@ -105,7 +107,8 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction("abs")
     @SqlType(StandardTypes.TINYINT)
-    public static long absTinyint(@SqlType(StandardTypes.TINYINT) long num)
+    public static long absTinyint(
+            @ScalarPropagateSourceStats(propagateAllStats = false, nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.TINYINT) long num)
     {
         checkCondition(num != Byte.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -128 is out of range for abs(tinyint)");
         return Math.abs(num);
@@ -114,7 +117,8 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction("abs")
     @SqlType(StandardTypes.SMALLINT)
-    public static long absSmallint(@SqlType(StandardTypes.SMALLINT) long num)
+    public static long absSmallint(
+            @ScalarPropagateSourceStats(propagateAllStats = false, nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.SMALLINT) long num)
     {
         checkCondition(num != Short.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -32768 is out of range for abs(smallint)");
         return Math.abs(num);
@@ -123,7 +127,8 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction("abs")
     @SqlType(StandardTypes.INTEGER)
-    public static long absInteger(@SqlType(StandardTypes.INTEGER) long num)
+    public static long absInteger(
+            @ScalarPropagateSourceStats(propagateAllStats = false, nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.INTEGER) long num)
     {
         checkCondition(num != Integer.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -2147483648 is out of range for abs(integer)");
         return Math.abs(num);
@@ -132,7 +137,8 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction
     @SqlType(StandardTypes.BIGINT)
-    public static long abs(@SqlType(StandardTypes.BIGINT) long num)
+    public static long abs(
+            @ScalarPropagateSourceStats(propagateAllStats = false, nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.BIGINT) long num)
     {
         checkCondition(num != Long.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -9223372036854775808 is out of range for abs(bigint)");
         return Math.abs(num);
@@ -141,7 +147,8 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    public static double abs(@SqlType(StandardTypes.DOUBLE) double num)
+    public static double abs(
+            @ScalarPropagateSourceStats(propagateAllStats = false, nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num)
     {
         return Math.abs(num);
     }
@@ -154,7 +161,8 @@ public final class MathFunctions
 
         @LiteralParameters({"p", "s"})
         @SqlType("decimal(p, s)")
-        public static long absShort(@SqlType("decimal(p, s)") long arg)
+        public static long absShort(
+                @ScalarPropagateSourceStats(propagateAllStats = false, nullFraction = USE_SOURCE_STATS) @SqlType("decimal(p, s)") long arg)
         {
             return arg > 0 ? arg : -arg;
         }
