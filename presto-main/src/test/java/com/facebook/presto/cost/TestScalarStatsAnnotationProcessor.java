@@ -38,7 +38,9 @@ import java.util.Optional;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.common.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.common.type.VarcharType.createVarcharType;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeStatsFromAnnotations;
 import static com.facebook.presto.spi.function.FunctionKind.SCALAR;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.Constants.NON_NULL_ROW_COUNT_CONST;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.MAX_TYPE_WIDTH_VARCHAR;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.NON_NULL_ROW_COUNT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.ROW_COUNT;
@@ -72,7 +74,7 @@ public class TestScalarStatsAnnotationProcessor
             new VariableReferenceExpression(Optional.empty(), "y", createVarcharType(10)));
 
     @Test
-    public void testProcessConstantStatsTakePrecedence()
+    public void testComputeStatsFromAnnotationsConstantStatsTakePrecedence()
     {
         Signature signature = new Signature(QualifiedObjectName.valueOf("presto.default.test"), SCALAR, VARCHAR_TYPE_10);
         CallExpression callExpression =
@@ -81,7 +83,7 @@ public class TestScalarStatsAnnotationProcessor
         ScalarStatsHeader scalarStatsHeader = new ScalarStatsHeader(
                 createScalarFunctionConstantStatsInstance(1, 10, 0.1, 2.3, 25),
                 ImmutableMap.of(1, createScalarPropagateSourceStatsInstance(true, UNKNOWN, ROW_COUNT, UNKNOWN, UNKNOWN, UNKNOWN)));
-        VariableStatsEstimate actualStats = ScalarStatsAnnotationProcessor.process(1000, callExpression, STATS_ESTIMATE_LIST, scalarStatsHeader);
+        VariableStatsEstimate actualStats = computeStatsFromAnnotations(callExpression, STATS_ESTIMATE_LIST, scalarStatsHeader, 1000);
         VariableStatsEstimate expectedStats = VariableStatsEstimate.builder()
                 .setLowValue(1)
                 .setHighValue(10)
@@ -93,7 +95,7 @@ public class TestScalarStatsAnnotationProcessor
     }
 
     @Test
-    public void testProcessNaNSourceStats()
+    public void testComputeStatsFromAnnotationsNaNSourceStats()
     {
         Signature signature = new Signature(QualifiedObjectName.valueOf("presto.default.test"), SCALAR, VARCHAR_TYPE_10,
                 VARCHAR_TYPE_10, VARCHAR_TYPE_10);
@@ -102,7 +104,7 @@ public class TestScalarStatsAnnotationProcessor
         ScalarStatsHeader scalarStatsHeader = new ScalarStatsHeader(
                 CONSTANT_STATS_UNKNOWN,
                 ImmutableMap.of(1, createScalarPropagateSourceStatsInstance(true, USE_SOURCE_STATS, USE_MAX_ARGUMENT, SUM_ARGUMENTS, SUM_ARGUMENTS, NON_NULL_ROW_COUNT)));
-        VariableStatsEstimate actualStats = ScalarStatsAnnotationProcessor.process(1000, callExpression, STATS_ESTIMATE_LIST_WITH_UNKNOWN, scalarStatsHeader);
+        VariableStatsEstimate actualStats = computeStatsFromAnnotations(callExpression, STATS_ESTIMATE_LIST_WITH_UNKNOWN, scalarStatsHeader, 1000);
         VariableStatsEstimate expectedStats = VariableStatsEstimate
                 .buildFrom(VariableStatsEstimate.unknown())
                 .setDistinctValuesCount(1000)
@@ -111,7 +113,7 @@ public class TestScalarStatsAnnotationProcessor
     }
 
     @Test
-    public void testProcessTypeWidthBoundaryConditions()
+    public void testComputeStatsFromAnnotationsTypeWidthBoundaryConditions()
     {
         VariableStatsEstimate statsEstimateLarge =
                 VariableStatsEstimate.builder()
@@ -129,7 +131,7 @@ public class TestScalarStatsAnnotationProcessor
                 CONSTANT_STATS_UNKNOWN,
                 ImmutableMap.of(1, createScalarPropagateSourceStatsInstance(false, USE_SOURCE_STATS, SUM_ARGUMENTS, SUM_ARGUMENTS, SUM_ARGUMENTS, MAX_TYPE_WIDTH_VARCHAR)));
         VariableStatsEstimate actualStats =
-                ScalarStatsAnnotationProcessor.process(Double.MAX_VALUE - 1, callExpression, ImmutableList.of(statsEstimateLarge, statsEstimateLarge), scalarStatsHeader);
+                computeStatsFromAnnotations(callExpression, ImmutableList.of(statsEstimateLarge, statsEstimateLarge), scalarStatsHeader, Double.MAX_VALUE - 1);
         VariableStatsEstimate expectedStats = VariableStatsEstimate
                 .builder()
                 .setNullsFraction(0.0)
@@ -139,7 +141,7 @@ public class TestScalarStatsAnnotationProcessor
     }
 
     @Test
-    public void testProcessTypeWidthBoundaryConditions2()
+    public void testComputeStatsFromAnnotationsTypeWidthBoundaryConditions2()
     {
         VariableStatsEstimate statsEstimateLarge =
                 VariableStatsEstimate.builder()
@@ -161,7 +163,7 @@ public class TestScalarStatsAnnotationProcessor
                         USE_MIN_ARGUMENT, SUM_ARGUMENTS, SUM_ARGUMENTS, SUM_ARGUMENTS,
                         SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT)));
         VariableStatsEstimate actualStats =
-                ScalarStatsAnnotationProcessor.process(Double.MAX_VALUE - 1, callExpression, ImmutableList.of(statsEstimateLarge, statsEstimateLarge), scalarStatsHeader);
+                computeStatsFromAnnotations(callExpression, ImmutableList.of(statsEstimateLarge, statsEstimateLarge), scalarStatsHeader, Double.MAX_VALUE - 1);
         VariableStatsEstimate expectedStats = VariableStatsEstimate
                 .builder()
                 .setLowValue(Double.MIN_VALUE)
@@ -173,15 +175,15 @@ public class TestScalarStatsAnnotationProcessor
     }
 
     @Test
-    public void testProcessConstantStats()
+    public void testComputeStatsFromAnnotationsConstantStats()
     {
         Signature signature = new Signature(QualifiedObjectName.valueOf("presto.default.test"), SCALAR, VARCHAR_TYPE_10);
         CallExpression callExpression =
                 new CallExpression("test", new BuiltInFunctionHandle(signature), createVarcharType(10), ImmutableList.of());
         ScalarStatsHeader scalarStatsHeader = new ScalarStatsHeader(
-                createScalarFunctionConstantStatsInstance(0, 1, 0.1, 8, NON_NULL_ROW_COUNT.getValue()),
+                createScalarFunctionConstantStatsInstance(0, 1, 0.1, 8, NON_NULL_ROW_COUNT_CONST),
                 ImmutableMap.of());
-        VariableStatsEstimate actualStats = ScalarStatsAnnotationProcessor.process(1000, callExpression, STATS_ESTIMATE_LIST, scalarStatsHeader);
+        VariableStatsEstimate actualStats = computeStatsFromAnnotations(callExpression, STATS_ESTIMATE_LIST, scalarStatsHeader, 1000);
         VariableStatsEstimate expectedStats = VariableStatsEstimate.builder()
                 .setLowValue(0)
                 .setHighValue(1)
@@ -193,14 +195,14 @@ public class TestScalarStatsAnnotationProcessor
     }
 
     @Test
-    public void testProcessConstantNDVWithNullFractionFromArgumentStats()
+    public void testComputeStatsFromAnnotationsConstantNDVWithNullFractionFromArgumentStats()
     {
         Signature signature = new Signature(QualifiedObjectName.valueOf("presto.default.test"), SCALAR, VARCHAR_TYPE_10, VARCHAR_TYPE_10, VARCHAR_TYPE_10);
         CallExpression callExpression = new CallExpression("test", new BuiltInFunctionHandle(signature), createVarcharType(10), TWO_ARGUMENTS);
         ScalarStatsHeader scalarStatsHeader = new ScalarStatsHeader(
-                createScalarFunctionConstantStatsInstance(0, 1, NaN, NaN, NON_NULL_ROW_COUNT.getValue()),
+                createScalarFunctionConstantStatsInstance(0, 1, NaN, NaN, NON_NULL_ROW_COUNT_CONST),
                 ImmutableMap.of(0, createScalarPropagateSourceStatsInstance(false, UNKNOWN, UNKNOWN, SUM_ARGUMENTS, USE_SOURCE_STATS, UNKNOWN)));
-        VariableStatsEstimate actualStats = ScalarStatsAnnotationProcessor.process(1000, callExpression, STATS_ESTIMATE_LIST, scalarStatsHeader);
+        VariableStatsEstimate actualStats = computeStatsFromAnnotations(callExpression, STATS_ESTIMATE_LIST, scalarStatsHeader, 1000);
         VariableStatsEstimate expectedStats = VariableStatsEstimate.builder()
                 .setLowValue(0)
                 .setHighValue(1)
