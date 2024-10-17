@@ -16,6 +16,7 @@ package com.facebook.presto.cost;
 import com.facebook.presto.FullConnectorSession;
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
+import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeSignature;
@@ -66,6 +67,9 @@ import java.util.stream.IntStream;
 
 import static com.facebook.presto.common.function.OperatorType.DIVIDE;
 import static com.facebook.presto.common.function.OperatorType.MODULUS;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeComparisonOperatorStatistics;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeConcatStatistics;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeHashCodeOperatorStatistics;
 import static com.facebook.presto.cost.StatsUtil.toStatsRepresentation;
 import static com.facebook.presto.spi.relation.ExpressionOptimizer.Level.OPTIMIZED;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.COALESCE;
@@ -240,9 +244,19 @@ public class ScalarStatsCalculator
             requireNonNull(call, "call is null");
             List<VariableStatsEstimate> sourceStatsList =
                     IntStream.range(0, call.getArguments().size()).mapToObj(argumentIndex -> getSourceStats(call, context, argumentIndex)).collect(toImmutableList());
-            VariableStatsEstimate result =
-                    ScalarStatsAnnotationProcessor.process(input.getOutputRowCount(), call, sourceStatsList, scalarStatsHeader);
-            return result;
+            FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(call.getFunctionHandle());
+            if (functionMetadata.getOperatorType().map(OperatorType::isHashOperator).orElse(false)) {
+                return computeHashCodeOperatorStatistics(call, sourceStatsList, input.getOutputRowCount());
+            }
+
+            if (functionMetadata.getOperatorType().map(OperatorType::isComparisonOperator).orElse(false)) {
+                return computeComparisonOperatorStatistics(call, sourceStatsList);
+            }
+
+            if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.concat"))) {
+                return computeConcatStatistics(call, sourceStatsList, input.getOutputRowCount());
+            }
+            return ScalarStatsAnnotationProcessor.computeStatsFromAnnotations(call, sourceStatsList, scalarStatsHeader, input.getOutputRowCount());
         }
 
         private VariableStatsEstimate computeCastStatistics(CallExpression call, Void context)
