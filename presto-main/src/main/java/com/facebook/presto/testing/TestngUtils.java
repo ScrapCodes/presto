@@ -31,4 +31,16 @@ public final class TestngUtils
                 },
                 builder -> builder.toArray(new Object[][] {}));
     }
+
+    public static <T> Collector<T, ?, Object[][]> toDataProviderFromArray()
+    {
+        return Collector.of(
+                ArrayList::new,
+                ArrayList::add,
+                (left, right) -> {
+                    left.addAll(right);
+                    return left;
+                },
+                builder -> builder.toArray(new Object[][] {}));
+    }
 }

@@ -26,8 +26,8 @@ import com.facebook.presto.spi.relation.RowExpression;
 import java.util.List;
 import java.util.Map;
 
-import static com.facebook.presto.spi.function.StatsPropagationBehavior.NON_NULL_ROW_COUNT;
-import static com.facebook.presto.spi.function.StatsPropagationBehavior.ROW_COUNT;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.Constants.NON_NULL_ROW_COUNT_CONST;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.Constants.ROW_COUNT_CONST;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUM_ARGUMENTS;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.UNKNOWN;
@@ -41,6 +41,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isFinite;
 import static java.lang.Double.isNaN;
+import static java.util.Objects.requireNonNull;
 
 public final class ScalarStatsAnnotationProcessor
 {
@@ -48,11 +49,69 @@ public final class ScalarStatsAnnotationProcessor
     {
     }
 
-    public static VariableStatsEstimate process(
-            double outputRowCount,
+    public static VariableStatsEstimate computeConcatStatistics(CallExpression call, List<VariableStatsEstimate> sourceStats, double outputRowCount)
+    {  // Concat function is specially handled since it is a generated function for all arity.
+        double nullFraction = NaN;
+        double ndv = NaN;
+        double avgRowSize = 0.0;
+        for (VariableStatsEstimate stat : sourceStats) {
+            if (isFinite(stat.getNullsFraction())) {
+                nullFraction = firstFiniteValue(nullFraction, 0.0);
+                nullFraction = max(nullFraction, stat.getNullsFraction());
+            }
+            if (isFinite(stat.getDistinctValuesCount())) {
+                ndv = firstFiniteValue(ndv, 0.0);
+                ndv = max(ndv, stat.getDistinctValuesCount());
+            }
+            if (isFinite(stat.getAverageRowSize())) {
+                avgRowSize += stat.getAverageRowSize();
+            }
+        }
+        if (avgRowSize == 0.0) {
+            avgRowSize = NaN;
+        }
+        return VariableStatsEstimate.builder()
+                .setNullsFraction(nullFraction)
+                .setDistinctValuesCount(minExcludingNaNs(ndv, outputRowCount))
+                .setAverageRowSize(minExcludingNaNs(returnNaNIfTypeWidthUnknown(getReturnTypeWidth(call, SUM_ARGUMENTS)), avgRowSize))
+                .build();
+    }
+
+    public static VariableStatsEstimate computeHashCodeOperatorStatistics(CallExpression call, List<VariableStatsEstimate> sourceStats, double outputRowCount)
+    {
+        requireNonNull(call, "call is null");
+        checkArgument(sourceStats.size() == 1,
+                "exactly one argument expected for hash code operator scalar function");
+        VariableStatsEstimate argStats = sourceStats.get(0);
+        VariableStatsEstimate.Builder result =
+                VariableStatsEstimate.builder()
+                        .setAverageRowSize(returnNaNIfTypeWidthUnknown(getReturnTypeWidth(call, UNKNOWN)))
+                        .setNullsFraction(argStats.getNullsFraction())
+                        .setDistinctValuesCount(minExcludingNaNs(argStats.getDistinctValuesCount(), outputRowCount));
+        return result.build();
+    }
+
+    public static VariableStatsEstimate computeComparisonOperatorStatistics(CallExpression call, List<VariableStatsEstimate> sourceStats)
+    {
+        requireNonNull(call, "call is null");
+        if (sourceStats.size() != 2) {
+            return VariableStatsEstimate.unknown();
+        }
+        VariableStatsEstimate left = sourceStats.get(0);
+        VariableStatsEstimate right = sourceStats.get(1);
+        VariableStatsEstimate.Builder result =
+                VariableStatsEstimate.builder()
+                        .setAverageRowSize(returnNaNIfTypeWidthUnknown(getReturnTypeWidth(call, UNKNOWN)))
+                        .setNullsFraction(left.getNullsFraction() + right.getNullsFraction() - left.getNullsFraction() * right.getNullsFraction())
+                        .setDistinctValuesCount(1.0);
+        return result.build();
+    }
+
+    public static VariableStatsEstimate computeStatsFromAnnotations(
             CallExpression callExpression,
             List<VariableStatsEstimate> sourceStats,
-            ScalarStatsHeader scalarStatsHeader)
+            ScalarStatsHeader scalarStatsHeader,
+            double outputRowCount)
     {
         double nullFraction = scalarStatsHeader.getNullFraction();
         double distinctValuesCount = NaN;
@@ -99,10 +158,10 @@ public final class ScalarStatsAnnotationProcessor
     private static double processDistinctValuesCount(double outputRowCount, double nullFraction, double distinctValuesCountFromConstant, double distinctValuesCount)
     {
         if (isFinite(distinctValuesCountFromConstant)) {
-            if (nearlyEqual(distinctValuesCountFromConstant, NON_NULL_ROW_COUNT.getValue(), 0.1)) {
+            if (nearlyEqual(distinctValuesCountFromConstant, NON_NULL_ROW_COUNT_CONST, 0.1)) {
                 distinctValuesCountFromConstant = outputRowCount * (1 - firstFiniteValue(nullFraction, 0.0));
             }
-            else if (nearlyEqual(distinctValuesCount, ROW_COUNT.getValue(), 0.1)) {
+            else if (nearlyEqual(distinctValuesCount, ROW_COUNT_CONST, 0.1)) {
                 distinctValuesCountFromConstant = outputRowCount;
             }
         }
@@ -164,6 +223,14 @@ public final class ScalarStatsAnnotationProcessor
                 case USE_TYPE_WIDTH_VARCHAR:
                     statValue = returnNaNIfTypeWidthUnknown(getTypeWidthVarchar(callExpression.getArguments().get(sourceStatsArgumentIndex).getType()));
                     break;
+                case LOG10_SOURCE_STATS:
+                    statValue = Math.log10(sourceStats.get(sourceStatsArgumentIndex));
+                    break;
+                case LOG2_SOURCE_STATS:
+                    statValue = Math.log(sourceStats.get(sourceStatsArgumentIndex)) / Math.log(2);
+                    break;
+                case LOG_NATURAL_SOURCE_STATS:
+                    statValue = Math.log(sourceStats.get(sourceStatsArgumentIndex));
             }
         }
         return statValue;
