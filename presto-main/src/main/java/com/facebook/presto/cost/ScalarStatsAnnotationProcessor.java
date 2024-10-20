@@ -14,6 +14,8 @@
 
 package com.facebook.presto.cost;
 
+import com.facebook.presto.common.type.CharType;
+import com.facebook.presto.common.type.DateType;
 import com.facebook.presto.common.type.FixedWidthType;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.VarcharType;
@@ -21,13 +23,18 @@ import com.facebook.presto.spi.function.ScalarPropagateSourceStats;
 import com.facebook.presto.spi.function.ScalarStatsHeader;
 import com.facebook.presto.spi.function.StatsPropagationBehavior;
 import com.facebook.presto.spi.relation.CallExpression;
+import com.facebook.presto.spi.relation.ConstantExpression;
 import com.facebook.presto.spi.relation.RowExpression;
+import com.facebook.presto.type.IntervalYearMonthType;
+import org.joda.time.DateTimeField;
+import org.joda.time.chrono.ISOChronology;
 
 import java.util.List;
 import java.util.Map;
 
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.Constants.NON_NULL_ROW_COUNT_CONST;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.Constants.ROW_COUNT_CONST;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUBSTR_ROW_SIZE;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUM_ARGUMENTS;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.UNKNOWN;
@@ -42,6 +49,7 @@ import static java.lang.Double.NaN;
 import static java.lang.Double.isFinite;
 import static java.lang.Double.isNaN;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.DAYS;
 
 public final class ScalarStatsAnnotationProcessor
 {
@@ -104,6 +112,32 @@ public final class ScalarStatsAnnotationProcessor
                         .setAverageRowSize(returnNaNIfTypeWidthUnknown(getReturnTypeWidth(call, UNKNOWN)))
                         .setNullsFraction(left.getNullsFraction() + right.getNullsFraction() - left.getNullsFraction() * right.getNullsFraction())
                         .setDistinctValuesCount(1.0);
+        return result.build();
+    }
+
+    public static VariableStatsEstimate computeYearFunctionStatistics(CallExpression call, List<VariableStatsEstimate> sourceStats)
+    {
+        ISOChronology utcChronology = ISOChronology.getInstanceUTC();
+        DateTimeField YEAR = utcChronology.year();
+
+        if (sourceStats.size() != 1) {
+            return VariableStatsEstimate.unknown();
+        }
+        VariableStatsEstimate date = sourceStats.get(0);
+        VariableStatsEstimate.Builder result = VariableStatsEstimate.builder();
+        if (isFinite(date.getLowValue()) && isFinite(date.getHighValue()) && call.getArguments().get(0).getType() instanceof DateType) {
+            int minYear = YEAR.get(DAYS.toMillis(Double.valueOf(date.getLowValue()).longValue()));
+            int maxYear = YEAR.get(DAYS.toMillis(Double.valueOf(date.getHighValue()).longValue()));
+            int ndv = maxYear - minYear;
+            result.setDistinctValuesCount(minExcludingNaNs(ndv, date.getDistinctValuesCount()));
+            result.setLowValue(minYear);
+            result.setHighValue(maxYear);
+        }
+        else {
+            System.out.println("Stats unknown for " + call);
+        }
+        result.setAverageRowSize(returnNaNIfTypeWidthUnknown(getReturnTypeWidth(call, UNKNOWN)))
+                .setNullsFraction(date.getNullsFraction());
         return result.build();
     }
 
@@ -191,7 +225,7 @@ public final class ScalarStatsAnnotationProcessor
                 else {
                     switch (operation) {
                         case MAX_TYPE_WIDTH_VARCHAR:
-                            statValue = returnNaNIfTypeWidthUnknown(getTypeWidthVarchar(callExpression.getArguments().get(i).getType()));
+                            statValue = returnNaNIfTypeWidthUnknown(getTypeWidth(callExpression.getArguments().get(i).getType()));
                             break;
                         case USE_MIN_ARGUMENT:
                             statValue = min(statValue, sourceStats.get(i));
@@ -214,6 +248,11 @@ public final class ScalarStatsAnnotationProcessor
                 case USE_SOURCE_STATS:
                     statValue = sourceStats.get(sourceStatsArgumentIndex);
                     break;
+                case CONDITIONALLY_USE_SOURCE_STATS:
+                    if (sourceStats.get(sourceStatsArgumentIndex) < (outputRowCount / 100)) {
+                        statValue = sourceStats.get(sourceStatsArgumentIndex);
+                    }
+                    break;
                 case ROW_COUNT:
                     statValue = outputRowCount;
                     break;
@@ -221,7 +260,7 @@ public final class ScalarStatsAnnotationProcessor
                     statValue = outputRowCount * (1 - firstFiniteValue(nullFraction, 0.0));
                     break;
                 case USE_TYPE_WIDTH_VARCHAR:
-                    statValue = returnNaNIfTypeWidthUnknown(getTypeWidthVarchar(callExpression.getArguments().get(sourceStatsArgumentIndex).getType()));
+                    statValue = returnNaNIfTypeWidthUnknown(getTypeWidth(callExpression.getArguments().get(sourceStatsArgumentIndex).getType()));
                     break;
                 case LOG10_SOURCE_STATS:
                     statValue = Math.log10(sourceStats.get(sourceStatsArgumentIndex));
@@ -236,17 +275,20 @@ public final class ScalarStatsAnnotationProcessor
         return statValue;
     }
 
-    private static int getTypeWidthVarchar(Type argumentType)
+    private static int getTypeWidth(Type argumentType)
     {
         if (argumentType instanceof VarcharType) {
             if (!((VarcharType) argumentType).isUnbounded()) {
                 return ((VarcharType) argumentType).getLengthSafe();
             }
         }
+        if (argumentType instanceof CharType) {
+            return ((CharType) argumentType).getLength();
+        }
         return -VarcharType.MAX_LENGTH;
     }
 
-    private static double returnNaNIfTypeWidthUnknown(int typeWidthValue)
+    private static double returnNaNIfTypeWidthUnknown(long typeWidthValue)
     {
         if (typeWidthValue <= 0) {
             return NaN;
@@ -254,10 +296,13 @@ public final class ScalarStatsAnnotationProcessor
         return typeWidthValue;
     }
 
-    private static int getReturnTypeWidth(CallExpression callExpression, StatsPropagationBehavior operation)
+    private static long getReturnTypeWidth(CallExpression callExpression, StatsPropagationBehavior operation)
     {
         if (callExpression.getType() instanceof FixedWidthType) {
             return ((FixedWidthType) callExpression.getType()).getFixedSize();
+        }
+        if (callExpression.getType() instanceof CharType) {
+            return ((CharType) callExpression.getType()).getLength();
         }
         if (callExpression.getType() instanceof VarcharType) {
             VarcharType returnType = (VarcharType) callExpression.getType();
@@ -267,14 +312,14 @@ public final class ScalarStatsAnnotationProcessor
             if (operation == SUM_ARGUMENTS || operation == SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT) {
                 // since return type is an unbounded varchar and operation is SUM_ARGUMENTS,
                 // calculating the type width by doing a SUM of each argument's varchar type bounds - if available.
-                int sum = 0;
+                long sum = 0;
                 for (RowExpression r : callExpression.getArguments()) {
-                    int typeWidth;
+                    long typeWidth;
                     if (r instanceof CallExpression) { // argument is another function call
                         typeWidth = getReturnTypeWidth((CallExpression) r, UNKNOWN);
                     }
                     else {
-                        typeWidth = getTypeWidthVarchar(r.getType());
+                        typeWidth = getTypeWidth(r.getType());
                     }
                     if (typeWidth < 0) {
                         return -VarcharType.MAX_LENGTH;
@@ -282,6 +327,26 @@ public final class ScalarStatsAnnotationProcessor
                     sum += typeWidth;
                 }
                 return sum;
+            }
+            else if (operation == SUBSTR_ROW_SIZE) {
+                // if substring length argument is a constant expression.
+                int argSize = callExpression.getArguments().size();
+                if (argSize == 2 || argSize == 3) {
+                    long argumentTypeWidth = getTypeWidth(callExpression.getArguments().get(0).getType());
+                    RowExpression lengthExpression = callExpression.getArguments().get(1);
+                    if (argSize == 3) {
+                        lengthExpression = callExpression.getArguments().get(2);
+                    }
+                    if (lengthExpression instanceof ConstantExpression) {
+                        ConstantExpression expression = (ConstantExpression) lengthExpression;
+                        if (expression.getValue() instanceof Long) {
+                            long estimatedReturnTypeWidth = argumentTypeWidth - Math.abs((Long) expression.getValue());
+                            if (estimatedReturnTypeWidth > 0) {
+                                return estimatedReturnTypeWidth;
+                            }
+                        }
+                    }
+                }
             }
         }
         return -VarcharType.MAX_LENGTH;

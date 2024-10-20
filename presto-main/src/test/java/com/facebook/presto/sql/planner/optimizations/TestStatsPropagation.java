@@ -39,7 +39,7 @@ public class TestStatsPropagation
 {
     private LocalQueryRunner queryRunner;
 
-    private void assertPlanHasExpectedStats(Predicate<PlanNodeStatsEstimate> statsChecker, String sql)
+    private void assertPlanHasExpectedStats(Predicate<PlanNodeStatsEstimate> statsChecker, @Language("SQL") String sql)
     {
         List<PlanOptimizer> optimizers = queryRunner.getPlanOptimizers(true);
         queryRunner.inTransaction(queryRunner.getDefaultSession(), transactionSession -> {
@@ -76,6 +76,7 @@ public class TestStatsPropagation
                 "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and ltrim(lpad(l.comment, 10, ' ')) = rtrim(rpad(l.comment, 10, ' '))",
                 "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and substr(lower(l.comment), 2) = 'us'",
                 "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and l.comment LIKE '%u'",
+                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and l.comment LIKE '%u%'",
                 "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and levenshtein_distance(l.comment, 'no') = 2",
                 "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and hamming_distance(l.comment, 'no') = 2",
                 "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and normalize(l.comment, NFC) = 'us'",

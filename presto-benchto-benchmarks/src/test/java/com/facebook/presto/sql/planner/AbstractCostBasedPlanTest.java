@@ -66,7 +66,9 @@ public abstract class AbstractCostBasedPlanTest
     private static final String NO_FEATURE_ENABLED = "no_feature_enabled";
 
     private final Map<String, String> featuresMap =
-            ImmutableMap.of(NO_FEATURE_ENABLED, "", "histogram", OPTIMIZER_USE_HISTOGRAMS,
+            ImmutableMap.of(
+                    NO_FEATURE_ENABLED, "",
+                    "histogram", OPTIMIZER_USE_HISTOGRAMS,
                     "scalar_function_stats_propagation", SCALAR_FUNCTION_STATS_PROPAGATION_ENABLED);
 
     public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier)

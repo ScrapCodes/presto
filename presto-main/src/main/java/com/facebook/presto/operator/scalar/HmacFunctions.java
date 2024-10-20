@@ -19,7 +19,6 @@ import com.facebook.presto.spi.function.ScalarFunction;
 import com.facebook.presto.spi.function.ScalarFunctionConstantStats;
 import com.facebook.presto.spi.function.ScalarPropagateSourceStats;
 import com.facebook.presto.spi.function.SqlType;
-import com.facebook.presto.spi.function.StatsPropagationBehavior;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;

@@ -70,6 +70,7 @@ import static com.facebook.presto.common.function.OperatorType.MODULUS;
 import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeComparisonOperatorStatistics;
 import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeConcatStatistics;
 import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeHashCodeOperatorStatistics;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeYearFunctionStatistics;
 import static com.facebook.presto.cost.StatsUtil.toStatsRepresentation;
 import static com.facebook.presto.spi.relation.ExpressionOptimizer.Level.OPTIMIZED;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.COALESCE;
@@ -221,12 +222,35 @@ public class ScalarStatsCalculator
         private VariableStatsEstimate computeStatsViaAnnotations(CallExpression call, Void context, FunctionMetadata functionMetadata)
         {
             if (isStatsPropagationEnabled) {
+                List<VariableStatsEstimate> sourceStatsList =
+                        IntStream.range(0, call.getArguments().size()).mapToObj(argumentIndex -> getSourceStats(call, context, argumentIndex))
+                                .collect(toImmutableList());
+                if (functionMetadata.getOperatorType().map(OperatorType::isHashOperator).orElse(false)) {
+                    return computeHashCodeOperatorStatistics(call, sourceStatsList, input.getOutputRowCount());
+                }
+
+                if (functionMetadata.getOperatorType().map(OperatorType::isComparisonOperator).orElse(false)) {
+                    return computeComparisonOperatorStatistics(call, sourceStatsList);
+                }
+
+                if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.concat"))) {
+                    return computeConcatStatistics(call, sourceStatsList, input.getOutputRowCount());
+                }
+                if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.year"))) {
+                    return computeYearFunctionStatistics(call, sourceStatsList);
+                }
                 if (functionMetadata.hasStatsHeader() && call.getFunctionHandle() instanceof BuiltInFunctionHandle) {
                     Signature signature = ((BuiltInFunctionHandle) call.getFunctionHandle()).getSignature().canonicalization();
                     Optional<ScalarStatsHeader> statsHeader = functionMetadata.getScalarStatsHeader(signature);
                     if (statsHeader.isPresent()) {
                         return computeCallStatistics(call, context, statsHeader.get());
                     }
+                    else {
+                        System.out.println("Stats not found for function: " + call);
+                    }
+                }
+                else {
+                    System.out.println("Stats not found for function2: " + call);
                 }
             }
             return VariableStatsEstimate.unknown();
@@ -243,19 +267,8 @@ public class ScalarStatsCalculator
         {
             requireNonNull(call, "call is null");
             List<VariableStatsEstimate> sourceStatsList =
-                    IntStream.range(0, call.getArguments().size()).mapToObj(argumentIndex -> getSourceStats(call, context, argumentIndex)).collect(toImmutableList());
-            FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(call.getFunctionHandle());
-            if (functionMetadata.getOperatorType().map(OperatorType::isHashOperator).orElse(false)) {
-                return computeHashCodeOperatorStatistics(call, sourceStatsList, input.getOutputRowCount());
-            }
-
-            if (functionMetadata.getOperatorType().map(OperatorType::isComparisonOperator).orElse(false)) {
-                return computeComparisonOperatorStatistics(call, sourceStatsList);
-            }
-
-            if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.concat"))) {
-                return computeConcatStatistics(call, sourceStatsList, input.getOutputRowCount());
-            }
+                    IntStream.range(0, call.getArguments().size()).mapToObj(argumentIndex -> getSourceStats(call, context, argumentIndex))
+                            .collect(toImmutableList());
             return ScalarStatsAnnotationProcessor.computeStatsFromAnnotations(call, sourceStatsList, scalarStatsHeader, input.getOutputRowCount());
         }
 

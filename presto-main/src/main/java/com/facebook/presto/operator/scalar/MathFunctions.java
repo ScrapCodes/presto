@@ -67,6 +67,9 @@ import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RAN
 import static com.facebook.presto.spi.function.FunctionKind.SCALAR;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.Constants.NON_NULL_ROW_COUNT_CONST;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.Constants.ROW_COUNT_CONST;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.LOG10_SOURCE_STATS;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.LOG2_SOURCE_STATS;
+import static com.facebook.presto.spi.function.StatsPropagationBehavior.LOG_NATURAL_SOURCE_STATS;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.USE_MAX_ARGUMENT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.USE_SOURCE_STATS;
 import static com.facebook.presto.type.DecimalOperators.modulusScalarFunction;
@@ -580,6 +583,8 @@ public final class MathFunctions
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
     public static double ln(@ScalarPropagateSourceStats(
+            minValue = LOG_NATURAL_SOURCE_STATS,
+            maxValue = LOG_NATURAL_SOURCE_STATS,
             nullFraction = USE_SOURCE_STATS,
             distinctValuesCount = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num)
     {
@@ -590,6 +595,8 @@ public final class MathFunctions
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
     public static double log2(@ScalarPropagateSourceStats(
+            minValue = LOG2_SOURCE_STATS,
+            maxValue = LOG2_SOURCE_STATS,
             nullFraction = USE_SOURCE_STATS,
             distinctValuesCount = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num)
     {
@@ -600,6 +607,8 @@ public final class MathFunctions
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
     public static double log10(@ScalarPropagateSourceStats(
+            minValue = LOG10_SOURCE_STATS,
+            maxValue = LOG10_SOURCE_STATS,
             nullFraction = USE_SOURCE_STATS,
             distinctValuesCount = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num)
     {
@@ -685,7 +694,10 @@ public final class MathFunctions
     @Description("converts an angle in degrees to radians")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    public static double radians(@ScalarPropagateSourceStats(propagateAllStats = true) @SqlType(StandardTypes.DOUBLE) double degrees)
+    public static double radians(
+            @ScalarPropagateSourceStats(
+                    distinctValuesCount = USE_SOURCE_STATS,
+                    nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double degrees)
     {
         return Math.toRadians(degrees);
     }
