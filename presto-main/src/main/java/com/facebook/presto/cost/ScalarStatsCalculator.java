@@ -245,12 +245,6 @@ public class ScalarStatsCalculator
                     if (statsHeader.isPresent()) {
                         return computeCallStatistics(call, context, statsHeader.get());
                     }
-                    else {
-                        System.out.println("Stats not found for function: " + call);
-                    }
-                }
-                else {
-                    System.out.println("Stats not found for function2: " + call);
                 }
             }
             return VariableStatsEstimate.unknown();
