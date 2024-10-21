@@ -29,6 +29,7 @@ import com.facebook.presto.tpcds.TpcdsTableHandle;
 import com.facebook.presto.tpch.TpchTableHandle;
 import com.google.common.base.Strings;
 import com.google.common.base.VerifyException;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -37,13 +38,16 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.SystemSessionProperties.OPTIMIZER_USE_HISTOGRAMS;
+import static com.facebook.presto.SystemSessionProperties.SCALAR_FUNCTION_STATS_PROPAGATION_ENABLED;
 import static com.facebook.presto.spi.plan.JoinDistributionType.REPLICATED;
 import static com.facebook.presto.spi.plan.JoinType.INNER;
 import static com.facebook.presto.sql.Optimizer.PlanStage.OPTIMIZED_AND_VALIDATED;
-import static com.facebook.presto.testing.TestngUtils.toDataProvider;
+import static com.facebook.presto.testing.TestngUtils.toDataProviderFromArray;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.io.Files.createParentDirs;
@@ -59,6 +63,14 @@ import static org.testng.Assert.assertEquals;
 public abstract class AbstractCostBasedPlanTest
         extends BasePlanTest
 {
+    private static final String NO_FEATURE_ENABLED = "no_feature_enabled";
+
+    private final Map<String, String> featuresMap =
+            ImmutableMap.of(
+                    NO_FEATURE_ENABLED, "",
+                    "histogram", OPTIMIZER_USE_HISTOGRAMS,
+                    "scalar_function_stats_propagation", SCALAR_FUNCTION_STATS_PROPAGATION_ENABLED);
+
     public AbstractCostBasedPlanTest(LocalQueryRunnerSupplier supplier)
     {
         super(supplier);
@@ -69,30 +81,28 @@ public abstract class AbstractCostBasedPlanTest
     @DataProvider
     public Object[][] getQueriesDataProvider()
     {
-        return getQueryResourcePaths()
-                .collect(toDataProvider());
+        return featuresMap.keySet().stream().flatMap(feature -> getQueryResourcePaths().map(path -> new String[] {feature, path})).collect(toDataProviderFromArray());
     }
 
     @Test(dataProvider = "getQueriesDataProvider")
-    public void test(String queryResourcePath)
-    {
-        assertEquals(generateQueryPlan(read(queryResourcePath)), read(getQueryPlanResourcePath(queryResourcePath)));
-    }
-
-    @Test(dataProvider = "getQueriesDataProvider")
-    public void histogramsPlansMatch(String queryResourcePath)
+    public void test(String feature, String queryResourcePath)
     {
         String sql = read(queryResourcePath);
-        Session histogramSession = Session.builder(getQueryRunner().getDefaultSession())
-                .setSystemProperty(OPTIMIZER_USE_HISTOGRAMS, "true")
-                .build();
-        Session noHistogramSession = Session.builder(getQueryRunner().getDefaultSession())
-                .setSystemProperty(OPTIMIZER_USE_HISTOGRAMS, "false")
-                .build();
-        String regularPlan = generateQueryPlan(sql, noHistogramSession);
-        String histogramPlan = generateQueryPlan(sql, histogramSession);
-        if (!regularPlan.equals(histogramPlan)) {
-            assertEquals(histogramPlan, read(getHistogramPlanResourcePath(getQueryPlanResourcePath(queryResourcePath))));
+        if (!feature.equals(NO_FEATURE_ENABLED)) {
+            Session featureEnabledSession = Session.builder(getQueryRunner().getDefaultSession())
+                    .setSystemProperty(featuresMap.get(feature), "true")
+                    .build();
+            Session featureDisabledSession = Session.builder(getQueryRunner().getDefaultSession())
+                    .setSystemProperty(featuresMap.get(feature), "false")
+                    .build();
+            String regularPlan = generateQueryPlan(sql, featureDisabledSession);
+            String featureEnabledPlan = generateQueryPlan(sql, featureEnabledSession);
+            if (!regularPlan.equals(featureEnabledPlan)) {
+                assertEquals(featureEnabledPlan, read(getSpecificPlanResourcePath(feature, getQueryPlanResourcePath(queryResourcePath))));
+            }
+        }
+        else {
+            assertEquals(generateQueryPlan(sql), read(getQueryPlanResourcePath(queryResourcePath)));
         }
     }
 
@@ -101,10 +111,10 @@ public abstract class AbstractCostBasedPlanTest
         return queryResourcePath.replaceAll("\\.sql$", ".plan.txt");
     }
 
-    private String getHistogramPlanResourcePath(String regularPlanResourcePath)
+    private String getSpecificPlanResourcePath(String outDirPath, String regularPlanResourcePath)
     {
         Path root = Paths.get(regularPlanResourcePath);
-        return root.getParent().resolve("histogram/" + root.getFileName()).toString();
+        return root.getParent().resolve(format("%s/%s", outDirPath, root.getFileName())).toString();
     }
 
     private Path getResourceWritePath(String queryResourcePath)
@@ -124,25 +134,31 @@ public abstract class AbstractCostBasedPlanTest
                     .parallel()
                     .forEach(queryResourcePath -> {
                         try {
-                            Path queryPlanWritePath = getResourceWritePath(queryResourcePath);
-                            createParentDirs(queryPlanWritePath.toFile());
-                            Session histogramSession = Session.builder(getQueryRunner().getDefaultSession())
-                                    .setSystemProperty(OPTIMIZER_USE_HISTOGRAMS, "true")
-                                    .build();
-                            Session noHistogramSession = Session.builder(getQueryRunner().getDefaultSession())
-                                    .setSystemProperty(OPTIMIZER_USE_HISTOGRAMS, "false")
-                                    .build();
-                            String sql = read(queryResourcePath);
-                            String regularPlan = generateQueryPlan(sql, noHistogramSession);
-                            String histogramPlan = generateQueryPlan(sql, histogramSession);
-                            write(regularPlan.getBytes(UTF_8), queryPlanWritePath.toFile());
-                            // write out the histogram plan if it differs
-                            if (!regularPlan.equals(histogramPlan)) {
-                                Path histogramPlanWritePath = getResourceWritePath(getHistogramPlanResourcePath(queryResourcePath));
-                                createParentDirs(histogramPlanWritePath.toFile());
-                                write(histogramPlan.getBytes(UTF_8), histogramPlanWritePath.toFile());
+                            for (Entry<String, String> featureEntry : featuresMap.entrySet()) {
+                                String sql = read(queryResourcePath);
+                                if (!featureEntry.getKey().equals(NO_FEATURE_ENABLED)) {
+                                    Session featureDisabledSession = Session.builder(getQueryRunner().getDefaultSession())
+                                            .setSystemProperty(featureEntry.getValue(), "false")
+                                            .build();
+                                    String regularPlan = generateQueryPlan(sql, featureDisabledSession);
+                                    Session featureEnabledSession = Session.builder(getQueryRunner().getDefaultSession())
+                                            .setSystemProperty(featureEntry.getValue(), "true")
+                                            .build();
+                                    String featureEnabledPlan = generateQueryPlan(sql, featureEnabledSession);
+                                    // write out the feature enabled plan if it differs
+                                    if (!regularPlan.equals(featureEnabledPlan)) {
+                                        Path featureEnabledPlanWritePath = getResourceWritePath(getSpecificPlanResourcePath(featureEntry.getKey(), queryResourcePath));
+                                        createParentDirs(featureEnabledPlanWritePath.toFile());
+                                        write(featureEnabledPlan.getBytes(UTF_8), featureEnabledPlanWritePath.toFile());
+                                    }
+                                }
+                                else {
+                                    Path queryPlanWritePath = getResourceWritePath(queryResourcePath);
+                                    createParentDirs(queryPlanWritePath.toFile());
+                                    write(generateQueryPlan(sql).getBytes(UTF_8), queryPlanWritePath.toFile());
+                                }
+                                System.out.println("Generated expected plan for query: " + queryResourcePath);
                             }
-                            System.out.println("Generated expected plan for query: " + queryResourcePath);
                         }
                         catch (IOException e) {
                             throw new UncheckedIOException(e);

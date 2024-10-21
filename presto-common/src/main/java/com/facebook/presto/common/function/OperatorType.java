@@ -91,6 +91,12 @@ public enum OperatorType
         return this.equals(ADD) || this.equals(SUBTRACT) || this.equals(MULTIPLY) || this.equals(DIVIDE) || this.equals(MODULUS);
     }
 
+    public boolean isHashOperator()
+    {
+        return this.equals(HASH_CODE) ||
+                this.equals(XX_HASH_64);
+    }
+
     public static Optional<OperatorType> tryGetOperatorType(QualifiedObjectName operatorName)
     {
         return Optional.ofNullable(OPERATOR_TYPES.get(operatorName));
