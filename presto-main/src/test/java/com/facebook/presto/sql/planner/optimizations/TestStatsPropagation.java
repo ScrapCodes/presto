@@ -21,10 +21,12 @@ import com.facebook.presto.sql.Optimizer;
 import com.facebook.presto.sql.planner.Plan;
 import com.facebook.presto.sql.planner.assertions.BasePlanTest;
 import com.facebook.presto.testing.LocalQueryRunner;
+import com.facebook.presto.testing.TestngUtils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.util.List;
@@ -67,29 +69,55 @@ public class TestStatsPropagation
         queryRunner = createQueryRunner(ImmutableMap.of(SCALAR_FUNCTION_STATS_PROPAGATION_ENABLED, "true"));
     }
 
-    @Test
-    public void testStatsPropagationScalarStringFunction()
+    @DataProvider(name = "queriesWithStringFunctionsInJoinClause")
+    public Object[][] queriesWithStringFunctionsInJoinClause()
     {
-        List<String> sqlList = ImmutableList.of(
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and reverse(trim(l.comment)) = reverse(rtrim(ltrim(l.comment)))",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and lower(l.comment) = upper(l.comment)",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and ltrim(lpad(l.comment, 10, ' ')) = rtrim(rpad(l.comment, 10, ' '))",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and substr(lower(l.comment), 2) = 'us'",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and l.comment LIKE '%u'",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and l.comment LIKE '%u%'",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and levenshtein_distance(l.comment, 'no') = 2",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and hamming_distance(l.comment, 'no') = 2",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and normalize(l.comment, NFC) = 'us'",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and from_utf8(to_utf8(l.comment)) = 'us'",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and starts_with(o.orderstatus, l.comment)",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and ends_with(o.orderstatus, l.comment)",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and concat(o.orderstatus, l.comment) = 'new'",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and levenshtein_distance(l.comment, 'no') > 2",
-                "select * FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and levenshtein_distance(l.comment, 'no') < 20");
-        for (@Language("SQL") String sql : sqlList) {
-            assertPlanHasExpectedStats(planNodeStatsEstimate -> !planNodeStatsEstimate.isOutputRowCountUnknown(), sql);
-            assertPlanHasExpectedVariableStats(stats -> isFinite(stats.getDistinctValuesCount()), sql);
-            assertPlanHasExpectedVariableStats(stats -> isFinite(stats.getNullsFraction()), sql);
-        }
+        return ImmutableList.of(
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and reverse(trim(l.comment)) = reverse(rtrim(ltrim(l.comment)))",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and lower(l.comment) = upper(l.comment)",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and ltrim(lpad(l.comment, 10, ' ')) = rtrim(rpad(l.comment, 10, ' '))",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and substr(lower(l.comment), 2) = 'us'",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and l.comment LIKE '%u'",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and l.comment LIKE '%u%'",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and levenshtein_distance(l.comment, 'no') = 2",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and hamming_distance(l.comment, 'no') = 2",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and normalize(l.comment, NFC) = 'us'",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and from_utf8(to_utf8(l.comment)) = 'us'",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and starts_with(o.orderstatus, l.comment)",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and ends_with(o.orderstatus, l.comment)",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and concat(o.orderstatus, l.comment) LIKE '%new us%'",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and levenshtein_distance(l.comment, 'no') > 2",
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and levenshtein_distance(l.comment, 'no') < 20")
+                .stream().collect(TestngUtils.toDataProvider());
+    }
+
+    @DataProvider(name = "queriesWithMathFunctionsInJoinClause")
+    public Object[][] queriesWithMathFunctionsInJoinClause()
+    {
+        return ImmutableList.of(
+                        "SELECT 1 FROM lineitem l, orders o WHERE l.orderkey=o.orderkey and l.discount = (SELECT random() FROM nation n where n.nationkey=1)",
+                        "SELECT 1 FROM lineitem l, orders o WHERE l.orderkey=o.orderkey and log10(o.totalprice) > 1",
+                        // "SELECT 1 FROM lineitem l, orders o WHERE l.orderkey=o.orderkey and is_nan(o.totalprice)", // failing due to source stats missing for orderkey.
+                        "SELECT 1 FROM orders o, lineitem as l WHERE o.orderkey = l.orderkey and year(o.orderdate) <> year(l.shipdate) ")
+                .stream().collect(TestngUtils.toDataProvider());
+    }
+
+    @Test(dataProvider = "queriesWithStringFunctionsInJoinClause")
+    public void testStatsPropagationScalarStringFunction(@Language("SQL") String query)
+    {
+        ensurePlanNodesHaveStats(query);
+    }
+
+    @Test(dataProvider = "queriesWithMathFunctionsInJoinClause")
+    public void testStatsPropagationScalarMathFunction(@Language("SQL") String query)
+    {
+        ensurePlanNodesHaveStats(query);
+    }
+
+    private void ensurePlanNodesHaveStats(@Language("SQL") String query)
+    {
+        assertPlanHasExpectedStats(planNodeStatsEstimate -> !planNodeStatsEstimate.isOutputRowCountUnknown(), query);
+        assertPlanHasExpectedVariableStats(stats -> isFinite(stats.getDistinctValuesCount()), query);
+        assertPlanHasExpectedVariableStats(stats -> isFinite(stats.getNullsFraction()), query);
     }
 }

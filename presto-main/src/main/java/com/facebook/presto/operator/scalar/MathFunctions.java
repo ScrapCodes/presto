@@ -114,8 +114,7 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction("abs")
     @SqlType(StandardTypes.TINYINT)
-    public static long absTinyint(
-            @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.TINYINT) long num)
+    public static long absTinyint(@SqlType(StandardTypes.TINYINT) long num)
     {
         checkCondition(num != Byte.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -128 is out of range for abs(tinyint)");
         return Math.abs(num);
@@ -124,8 +123,7 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction("abs")
     @SqlType(StandardTypes.SMALLINT)
-    public static long absSmallint(
-            @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.SMALLINT) long num)
+    public static long absSmallint(@SqlType(StandardTypes.SMALLINT) long num)
     {
         checkCondition(num != Short.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -32768 is out of range for abs(smallint)");
         return Math.abs(num);
@@ -134,8 +132,7 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction("abs")
     @SqlType(StandardTypes.INTEGER)
-    public static long absInteger(
-            @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.INTEGER) long num)
+    public static long absInteger(@SqlType(StandardTypes.INTEGER) long num)
     {
         checkCondition(num != Integer.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -2147483648 is out of range for abs(integer)");
         return Math.abs(num);
@@ -144,8 +141,7 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction
     @SqlType(StandardTypes.BIGINT)
-    public static long abs(
-            @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.BIGINT) long num)
+    public static long abs(@SqlType(StandardTypes.BIGINT) long num)
     {
         checkCondition(num != Long.MIN_VALUE, NUMERIC_VALUE_OUT_OF_RANGE, "Value -9223372036854775808 is out of range for abs(bigint)");
         return Math.abs(num);
@@ -154,8 +150,7 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    public static double abs(
-            @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num)
+    public static double abs(@SqlType(StandardTypes.DOUBLE) double num)
     {
         return Math.abs(num);
     }
@@ -168,8 +163,7 @@ public final class MathFunctions
 
         @LiteralParameters({"p", "s"})
         @SqlType("decimal(p, s)")
-        public static long absShort(
-                @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType("decimal(p, s)") long arg)
+        public static long absShort(@SqlType("decimal(p, s)") long arg)
         {
             return arg > 0 ? arg : -arg;
         }
@@ -205,7 +199,7 @@ public final class MathFunctions
     @Description("absolute value")
     @ScalarFunction("abs")
     @SqlType(StandardTypes.REAL)
-    public static long absFloat(@ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.REAL) long num)
+    public static long absFloat(@SqlType(StandardTypes.REAL) long num)
     {
         return floatToRawIntBits(Math.abs(intBitsToFloat((int) num)));
     }
@@ -302,8 +296,7 @@ public final class MathFunctions
     @Description("round up to nearest integer")
     @ScalarFunction(alias = "ceil")
     @SqlType(StandardTypes.DOUBLE)
-    public static double ceiling(
-            @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num)
+    public static double ceiling(@SqlType(StandardTypes.DOUBLE) double num)
     {
         return Math.ceil(num);
     }
@@ -311,9 +304,7 @@ public final class MathFunctions
     @Description("round up to nearest integer")
     @ScalarFunction(value = "ceiling", alias = "ceil")
     @SqlType(StandardTypes.REAL)
-    public static long ceilingFloat(
-            @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS)
-            @SqlType(StandardTypes.REAL) long num)
+    public static long ceilingFloat(@SqlType(StandardTypes.REAL) long num)
     {
         return floatToRawIntBits((float) ceiling(intBitsToFloat((int) num)));
     }
@@ -362,7 +353,7 @@ public final class MathFunctions
     @Description("round to integer by dropping digits after decimal point")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    public static double truncate(@ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num)
+    public static double truncate(@SqlType(StandardTypes.DOUBLE) double num)
     {
         return Math.signum(num) * Math.floor(Math.abs(num));
     }
@@ -370,7 +361,7 @@ public final class MathFunctions
     @Description("round to integer by dropping digits after decimal point")
     @ScalarFunction
     @SqlType(StandardTypes.REAL)
-    public static long truncate(@ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.REAL) long num)
+    public static long truncate(@SqlType(StandardTypes.REAL) long num)
     {
         float numInFloat = intBitsToFloat((int) num);
         return floatToRawIntBits((float) (Math.signum(numInFloat) * Math.floor(Math.abs(numInFloat))));
@@ -379,7 +370,7 @@ public final class MathFunctions
     @Description("truncate to double by dropping digits after decimal point")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
-    public static double truncate(@ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num, @SqlType(StandardTypes.INTEGER) long decimals)
+    public static double truncate(@SqlType(StandardTypes.DOUBLE) double num, @SqlType(StandardTypes.INTEGER) long decimals)
     {
         if (Double.isNaN(num) || Double.isInfinite(num)) {
             // compatible with truncate(DOUBLE)
@@ -400,7 +391,7 @@ public final class MathFunctions
     @Description("truncate to float by dropping digits after decimal point")
     @ScalarFunction
     @SqlType(StandardTypes.REAL)
-    public static long truncate(@SqlType(StandardTypes.REAL) long num, @ScalarPropagateSourceStats(nullFraction = USE_SOURCE_STATS) @SqlType(StandardTypes.INTEGER) long decimals)
+    public static long truncate(@SqlType(StandardTypes.REAL) long num, @SqlType(StandardTypes.INTEGER) long decimals)
     {
         float numBitsToFloats = intBitsToFloat((int) num);
         if (Float.isNaN(numBitsToFloats) || Float.isInfinite(numBitsToFloats)) {
@@ -685,7 +676,7 @@ public final class MathFunctions
     @ScalarFunction(alias = "pow")
     @SqlType(StandardTypes.DOUBLE)
     public static double power(@ScalarPropagateSourceStats(
-            nullFraction = USE_SOURCE_STATS,
+            nullFraction = USE_MAX_ARGUMENT,
             distinctValuesCount = USE_SOURCE_STATS) @SqlType(StandardTypes.DOUBLE) double num, @SqlType(StandardTypes.DOUBLE) double exponent)
     {
         return Math.pow(num, exponent);

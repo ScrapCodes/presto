@@ -25,7 +25,6 @@ import com.facebook.presto.spi.function.StatsPropagationBehavior;
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.ConstantExpression;
 import com.facebook.presto.spi.relation.RowExpression;
-import com.facebook.presto.type.IntervalYearMonthType;
 import org.joda.time.DateTimeField;
 import org.joda.time.chrono.ISOChronology;
 
@@ -91,9 +90,12 @@ public final class ScalarStatsAnnotationProcessor
         checkArgument(sourceStats.size() == 1,
                 "exactly one argument expected for hash code operator scalar function");
         VariableStatsEstimate argStats = sourceStats.get(0);
+        if (argStats.isUnknown()) {
+            return VariableStatsEstimate.unknown();
+        }
         VariableStatsEstimate.Builder result =
                 VariableStatsEstimate.builder()
-                        .setAverageRowSize(returnNaNIfTypeWidthUnknown(getReturnTypeWidth(call, UNKNOWN)))
+                        .setAverageRowSize(minExcludingNaNs(argStats.getAverageRowSize(), returnNaNIfTypeWidthUnknown(getReturnTypeWidth(call, UNKNOWN))))
                         .setNullsFraction(argStats.getNullsFraction())
                         .setDistinctValuesCount(minExcludingNaNs(argStats.getDistinctValuesCount(), outputRowCount));
         return result.build();
@@ -118,7 +120,7 @@ public final class ScalarStatsAnnotationProcessor
     public static VariableStatsEstimate computeYearFunctionStatistics(CallExpression call, List<VariableStatsEstimate> sourceStats)
     {
         ISOChronology utcChronology = ISOChronology.getInstanceUTC();
-        DateTimeField YEAR = utcChronology.year();
+        DateTimeField year = utcChronology.year();
 
         if (sourceStats.size() != 1) {
             return VariableStatsEstimate.unknown();
@@ -126,8 +128,8 @@ public final class ScalarStatsAnnotationProcessor
         VariableStatsEstimate date = sourceStats.get(0);
         VariableStatsEstimate.Builder result = VariableStatsEstimate.builder();
         if (isFinite(date.getLowValue()) && isFinite(date.getHighValue()) && call.getArguments().get(0).getType() instanceof DateType) {
-            int minYear = YEAR.get(DAYS.toMillis(Double.valueOf(date.getLowValue()).longValue()));
-            int maxYear = YEAR.get(DAYS.toMillis(Double.valueOf(date.getHighValue()).longValue()));
+            int minYear = year.get(DAYS.toMillis(Double.valueOf(date.getLowValue()).longValue()));
+            int maxYear = year.get(DAYS.toMillis(Double.valueOf(date.getHighValue()).longValue()));
             int ndv = maxYear - minYear;
             result.setDistinctValuesCount(minExcludingNaNs(ndv, date.getDistinctValuesCount()));
             result.setLowValue(minYear);
@@ -195,7 +197,7 @@ public final class ScalarStatsAnnotationProcessor
             if (nearlyEqual(distinctValuesCountFromConstant, NON_NULL_ROW_COUNT_CONST, 0.1)) {
                 distinctValuesCountFromConstant = outputRowCount * (1 - firstFiniteValue(nullFraction, 0.0));
             }
-            else if (nearlyEqual(distinctValuesCount, ROW_COUNT_CONST, 0.1)) {
+            else if (nearlyEqual(distinctValuesCountFromConstant, ROW_COUNT_CONST, 0.1)) {
                 distinctValuesCountFromConstant = outputRowCount;
             }
         }
@@ -275,8 +277,11 @@ public final class ScalarStatsAnnotationProcessor
         return statValue;
     }
 
-    private static int getTypeWidth(Type argumentType)
+    public static int getTypeWidth(Type argumentType)
     {
+        if (argumentType instanceof FixedWidthType) {
+            return ((FixedWidthType) argumentType).getFixedSize();
+        }
         if (argumentType instanceof VarcharType) {
             if (!((VarcharType) argumentType).isUnbounded()) {
                 return ((VarcharType) argumentType).getLengthSafe();
@@ -288,7 +293,7 @@ public final class ScalarStatsAnnotationProcessor
         return -VarcharType.MAX_LENGTH;
     }
 
-    private static double returnNaNIfTypeWidthUnknown(long typeWidthValue)
+    public static double returnNaNIfTypeWidthUnknown(long typeWidthValue)
     {
         if (typeWidthValue <= 0) {
             return NaN;

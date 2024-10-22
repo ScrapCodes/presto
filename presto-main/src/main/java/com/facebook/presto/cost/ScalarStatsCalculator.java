@@ -71,6 +71,8 @@ import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeCom
 import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeConcatStatistics;
 import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeHashCodeOperatorStatistics;
 import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeYearFunctionStatistics;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.getTypeWidth;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.returnNaNIfTypeWidthUnknown;
 import static com.facebook.presto.cost.StatsUtil.toStatsRepresentation;
 import static com.facebook.presto.spi.relation.ExpressionOptimizer.Level.OPTIMIZED;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.COALESCE;
@@ -79,6 +81,7 @@ import static com.facebook.presto.sql.planner.LiteralInterpreter.evaluate;
 import static com.facebook.presto.sql.relational.Expressions.isNull;
 import static com.facebook.presto.util.MoreMath.max;
 import static com.facebook.presto.util.MoreMath.min;
+import static com.facebook.presto.util.MoreMath.nearlyEqual;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -179,7 +182,8 @@ public class ScalarStatsCalculator
             OptionalDouble doubleValue = toStatsRepresentation(metadata.getFunctionAndTypeManager(), session, literal.getType(), literal.getValue());
             VariableStatsEstimate.Builder estimate = VariableStatsEstimate.builder()
                     .setNullsFraction(0)
-                    .setDistinctValuesCount(1);
+                    .setDistinctValuesCount(1)
+                    .setAverageRowSize(returnNaNIfTypeWidthUnknown(getTypeWidth(literal.getType())));
 
             if (doubleValue.isPresent()) {
                 estimate.setLowValue(doubleValue.getAsDouble());
@@ -236,9 +240,11 @@ public class ScalarStatsCalculator
                 if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.concat"))) {
                     return computeConcatStatistics(call, sourceStatsList, input.getOutputRowCount());
                 }
+
                 if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.year"))) {
                     return computeYearFunctionStatistics(call, sourceStatsList);
                 }
+
                 if (functionMetadata.hasStatsHeader() && call.getFunctionHandle() instanceof BuiltInFunctionHandle) {
                     Signature signature = ((BuiltInFunctionHandle) call.getFunctionHandle()).getSignature().canonicalization();
                     Optional<ScalarStatsHeader> statsHeader = functionMetadata.getScalarStatsHeader(signature);
@@ -617,10 +623,10 @@ public class ScalarStatsCalculator
     private static VariableStatsEstimate estimateCoalesce(PlanNodeStatsEstimate input, VariableStatsEstimate left, VariableStatsEstimate right)
     {
         // Question to reviewer: do you have a method to check if fraction is empty or saturated?
-        if (left.getNullsFraction() == 0) {
+        if (nearlyEqual(left.getNullsFraction(), 0, 0.00001)) {
             return left;
         }
-        else if (left.getNullsFraction() == 1.0) {
+        else if (nearlyEqual(left.getNullsFraction(), 1.0, 0.00001)) {
             return right;
         }
         else {
