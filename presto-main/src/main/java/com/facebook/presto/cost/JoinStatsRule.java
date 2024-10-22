@@ -44,6 +44,7 @@ import static com.facebook.presto.SystemSessionProperties.getDefaultJoinSelectiv
 import static com.facebook.presto.SystemSessionProperties.shouldOptimizerUseHistograms;
 import static com.facebook.presto.SystemSessionProperties.useMLBasedStatisticsEnabled;
 import static com.facebook.presto.cost.DisjointRangeDomainHistogram.addConjunction;
+import static com.facebook.presto.cost.FilterStatsCalculator.JDBC_SAMPLES_DB;
 import static com.facebook.presto.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static com.facebook.presto.cost.VariableStatsEstimate.buildFrom;
 import static com.facebook.presto.expressions.LogicalRowExpressions.extractConjuncts;
@@ -147,12 +148,10 @@ public class JoinStatsRule
         String joinPredicatesStr = joinPredicates.stream().sorted().collect(Collectors.joining(" AND "));
         Integer hashValue = Objects.hash(filterPredicatesStr, joinPredicatesStr);
         if (mlStatsMap.containsKey(hashValue)) {
-//            System.out.println("In map: " + filterPredicatesStr + "||" + joinPredicatesStr);
             return mlStatsMap.get(hashValue);
         }
         try {
-            BayesCardPythonCallerAPI request = new BayesCardPythonCallerAPI(filterPredicatesStr, joinPredicatesStr);
-            PlanNodeStatsEstimate estimate = builder.setOutputRowCount(request.callAPI()).build();
+            PlanNodeStatsEstimate estimate = builder.setOutputRowCount(JDBC_SAMPLES_DB.estimatedRowCounts(filterPredicatesStr)).build();
             mlStatsMap.put(hashValue, estimate);
             return estimate;
         }

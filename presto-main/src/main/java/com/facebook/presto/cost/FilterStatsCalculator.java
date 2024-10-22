@@ -108,6 +108,7 @@ public class FilterStatsCalculator
     private final StatsNormalizer normalizer;
     private final LiteralEncoder literalEncoder;
     private final FunctionResolution functionResolution;
+    public static final JDBCQuerySamples JDBC_SAMPLES_DB = new JDBCQuerySamples("jdbc:duckdb:/Users/prashantsharma/work/prestodb/duckdb_imdb.db");
 
     @Inject
     public FilterStatsCalculator(Metadata metadata, ScalarStatsCalculator scalarStatsCalculator, StatsNormalizer normalizer)
@@ -159,19 +160,14 @@ public class FilterStatsCalculator
             Condition condition, Map<Integer, PlanNodeStatsEstimate> mlStatsMap)
     {
         PlanNodeStatsEstimate.Builder builder = PlanNodeStatsEstimate.builder();
-//        RowExpression simplifiedExpression = simplifyExpression(session.toConnectorSession(), predicate);
-//        // todo: calls the python program to pass tableName and predicate sql string
-//        String predicates = simplifiedExpression.toSQL(table);
         String filterPredicatesStr = condition.toSQL();
         Integer hashValue = Objects.hash(filterPredicatesStr, null);
         if (mlStatsMap.containsKey(hashValue)) {
-//            System.out.println("In map: " + filterPredicatesStr);
             return mlStatsMap.get(hashValue);
         }
         try {
-            BayesCardPythonCallerAPI request = new BayesCardPythonCallerAPI(filterPredicatesStr, null);
-            float estimate = request.callAPI();
-            PlanNodeStatsEstimate nodeStatsEstimate = builder.setOutputRowCount(estimate).build();
+            builder.setOutputRowCount(JDBC_SAMPLES_DB.estimatedRowCounts(filterPredicatesStr));
+            PlanNodeStatsEstimate nodeStatsEstimate = builder.build();
             mlStatsMap.put(hashValue, nodeStatsEstimate);
             return nodeStatsEstimate;
         }
