@@ -23,7 +23,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target(PARAMETER)
 public @interface ScalarPropagateSourceStats
 {
-    boolean propagateAllStats() default true;
+    boolean propagateAllStats() default false;
 
     StatsPropagationBehavior minValue() default StatsPropagationBehavior.UNKNOWN;
     StatsPropagationBehavior maxValue() default StatsPropagationBehavior.UNKNOWN;

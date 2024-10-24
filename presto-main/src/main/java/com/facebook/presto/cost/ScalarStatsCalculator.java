@@ -16,6 +16,7 @@ package com.facebook.presto.cost;
 import com.facebook.presto.FullConnectorSession;
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
+import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeSignature;
@@ -66,6 +67,15 @@ import java.util.stream.IntStream;
 
 import static com.facebook.presto.common.function.OperatorType.DIVIDE;
 import static com.facebook.presto.common.function.OperatorType.MODULUS;
+import static com.facebook.presto.cost.ScalarStatsAnnotationProcessor.computeStatsFromAnnotations;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.computeArithmeticBinaryStatistics;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.computeCastStatistics;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.computeComparisonOperatorStatistics;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.computeConcatStatistics;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.computeHashCodeOperatorStatistics;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.computeNegationStatistics;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.computeYearFunctionStatistics;
+import static com.facebook.presto.cost.ScalarStatsCalculatorUtils.getTypeWidth;
 import static com.facebook.presto.cost.StatsUtil.toStatsRepresentation;
 import static com.facebook.presto.spi.relation.ExpressionOptimizer.Level.OPTIMIZED;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.COALESCE;
@@ -74,6 +84,7 @@ import static com.facebook.presto.sql.planner.LiteralInterpreter.evaluate;
 import static com.facebook.presto.sql.relational.Expressions.isNull;
 import static com.facebook.presto.util.MoreMath.max;
 import static com.facebook.presto.util.MoreMath.min;
+import static com.facebook.presto.util.MoreMath.nearlyEqual;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -131,13 +142,16 @@ public class ScalarStatsCalculator
         @Override
         public VariableStatsEstimate visitCall(CallExpression call, Void context)
         {
+            List<VariableStatsEstimate> sourceStatsList =
+                    IntStream.range(0, call.getArguments().size()).mapToObj(argumentIndex -> getSourceStats(call, context, argumentIndex))
+                            .collect(toImmutableList());
             if (resolution.isNegateFunction(call.getFunctionHandle())) {
-                return computeNegationStatistics(call, context);
+                return computeNegationStatistics(sourceStatsList);
             }
 
             FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(call.getFunctionHandle());
             if (functionMetadata.getOperatorType().map(OperatorType::isArithmeticOperator).orElse(false)) {
-                return computeArithmeticBinaryStatistics(call, context);
+                return computeArithmeticBinaryStatistics(functionMetadata, sourceStatsList, input.getOutputRowCount());
             }
 
             RowExpression value = new RowExpressionOptimizer(metadata).optimize(call, OPTIMIZED, session);
@@ -152,10 +166,10 @@ public class ScalarStatsCalculator
 
             // value is not a constant, but we can still propagate estimation through cast
             if (resolution.isCastFunction(call.getFunctionHandle())) {
-                return computeCastStatistics(call, context);
+                return computeCastStatistics(call, metadata, sourceStatsList);
             }
 
-            return computeStatsViaAnnotations(call, context, functionMetadata);
+            return computeStatsViaAnnotations(call, sourceStatsList, functionMetadata);
         }
 
         @Override
@@ -174,7 +188,8 @@ public class ScalarStatsCalculator
             OptionalDouble doubleValue = toStatsRepresentation(metadata.getFunctionAndTypeManager(), session, literal.getType(), literal.getValue());
             VariableStatsEstimate.Builder estimate = VariableStatsEstimate.builder()
                     .setNullsFraction(0)
-                    .setDistinctValuesCount(1);
+                    .setDistinctValuesCount(1)
+                    .setAverageRowSize(getTypeWidth(literal.getType()));
 
             if (doubleValue.isPresent()) {
                 estimate.setLowValue(doubleValue.getAsDouble());
@@ -214,14 +229,34 @@ public class ScalarStatsCalculator
             return VariableStatsEstimate.unknown();
         }
 
-        private VariableStatsEstimate computeStatsViaAnnotations(CallExpression call, Void context, FunctionMetadata functionMetadata)
+        private VariableStatsEstimate computeStatsViaAnnotations(
+                CallExpression call,
+                List<VariableStatsEstimate> sourceStatsList,
+                FunctionMetadata functionMetadata)
         {
             if (isStatsPropagationEnabled) {
+
+                if (functionMetadata.getOperatorType().map(OperatorType::isHashOperator).orElse(false)) {
+                    return computeHashCodeOperatorStatistics(call, sourceStatsList, input.getOutputRowCount());
+                }
+
+                if (functionMetadata.getOperatorType().map(OperatorType::isComparisonOperator).orElse(false)) {
+                    return computeComparisonOperatorStatistics(call, sourceStatsList);
+                }
+
+                if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.concat"))) {
+                    return computeConcatStatistics(call, sourceStatsList, input.getOutputRowCount());
+                }
+
+                if (functionMetadata.getName().equals(QualifiedObjectName.valueOf("presto.default.year"))) {
+                    return computeYearFunctionStatistics(call, sourceStatsList);
+                }
+
                 if (functionMetadata.hasStatsHeader() && call.getFunctionHandle() instanceof BuiltInFunctionHandle) {
                     Signature signature = ((BuiltInFunctionHandle) call.getFunctionHandle()).getSignature().canonicalization();
                     Optional<ScalarStatsHeader> statsHeader = functionMetadata.getScalarStatsHeader(signature);
                     if (statsHeader.isPresent()) {
-                        return computeCallStatistics(call, context, statsHeader.get());
+                        return computeStatsFromAnnotations(call, sourceStatsList, statsHeader.get(), input.getOutputRowCount());
                     }
                 }
             }
@@ -233,135 +268,6 @@ public class ScalarStatsCalculator
             checkArgument(argumentIndex < call.getArguments().size(),
                     format("function argument index: %d >= %d (call argument size) for %s", argumentIndex, call.getArguments().size(), call));
             return call.getArguments().get(argumentIndex).accept(this, context);
-        }
-
-        private VariableStatsEstimate computeCallStatistics(CallExpression call, Void context, ScalarStatsHeader scalarStatsHeader)
-        {
-            requireNonNull(call, "call is null");
-            List<VariableStatsEstimate> sourceStatsList =
-                    IntStream.range(0, call.getArguments().size()).mapToObj(argumentIndex -> getSourceStats(call, context, argumentIndex)).collect(toImmutableList());
-            VariableStatsEstimate result =
-                    ScalarStatsAnnotationProcessor.process(input.getOutputRowCount(), call, sourceStatsList, scalarStatsHeader);
-            return result;
-        }
-
-        private VariableStatsEstimate computeCastStatistics(CallExpression call, Void context)
-        {
-            requireNonNull(call, "call is null");
-            VariableStatsEstimate sourceStats = getSourceStats(call, context, 0);
-
-            // todo - make this general postprocessing rule.
-            double distinctValuesCount = sourceStats.getDistinctValuesCount();
-            double lowValue = sourceStats.getLowValue();
-            double highValue = sourceStats.getHighValue();
-
-            if (TypeUtils.isIntegralType(call.getType().getTypeSignature(), metadata.getFunctionAndTypeManager())) {
-                // todo handle low/high value changes if range gets narrower due to cast (e.g. BIGINT -> SMALLINT)
-                if (isFinite(lowValue)) {
-                    lowValue = Math.round(lowValue);
-                }
-                if (isFinite(highValue)) {
-                    highValue = Math.round(highValue);
-                }
-                if (isFinite(lowValue) && isFinite(highValue)) {
-                    double integersInRange = highValue - lowValue + 1;
-                    if (!isNaN(distinctValuesCount) && distinctValuesCount > integersInRange) {
-                        distinctValuesCount = integersInRange;
-                    }
-                }
-            }
-
-            return VariableStatsEstimate.builder()
-                    .setNullsFraction(sourceStats.getNullsFraction())
-                    .setLowValue(lowValue)
-                    .setHighValue(highValue)
-                    .setDistinctValuesCount(distinctValuesCount)
-                    .build();
-        }
-
-        private VariableStatsEstimate computeNegationStatistics(CallExpression call, Void context)
-        {
-            requireNonNull(call, "call is null");
-            VariableStatsEstimate stats = getSourceStats(call, context, 0);
-            if (resolution.isNegateFunction(call.getFunctionHandle())) {
-                return VariableStatsEstimate.buildFrom(stats)
-                        .setLowValue(-stats.getHighValue())
-                        .setHighValue(-stats.getLowValue())
-                        .build();
-            }
-            throw new IllegalStateException(format("Unexpected sign: %s(%s)", call.getDisplayName(), call.getFunctionHandle()));
-        }
-
-        private VariableStatsEstimate computeArithmeticBinaryStatistics(CallExpression call, Void context)
-        {
-            requireNonNull(call, "call is null");
-            VariableStatsEstimate left = getSourceStats(call, context, 0);
-            VariableStatsEstimate right = getSourceStats(call, context, 1);
-
-            VariableStatsEstimate.Builder result = VariableStatsEstimate.builder()
-                    .setAverageRowSize(Math.max(left.getAverageRowSize(), right.getAverageRowSize()))
-                    .setNullsFraction(left.getNullsFraction() + right.getNullsFraction() - left.getNullsFraction() * right.getNullsFraction())
-                    .setDistinctValuesCount(min(left.getDistinctValuesCount() * right.getDistinctValuesCount(), input.getOutputRowCount()));
-            FunctionMetadata functionMetadata = metadata.getFunctionAndTypeManager().getFunctionMetadata(call.getFunctionHandle());
-            checkState(functionMetadata.getOperatorType().isPresent());
-            OperatorType operatorType = functionMetadata.getOperatorType().get();
-            double leftLow = left.getLowValue();
-            double leftHigh = left.getHighValue();
-            double rightLow = right.getLowValue();
-            double rightHigh = right.getHighValue();
-            if (isNaN(leftLow) || isNaN(leftHigh) || isNaN(rightLow) || isNaN(rightHigh)) {
-                result.setLowValue(NaN).setHighValue(NaN);
-            }
-            else if (operatorType.equals(DIVIDE) && rightLow < 0 && rightHigh > 0) {
-                result.setLowValue(Double.NEGATIVE_INFINITY)
-                        .setHighValue(Double.POSITIVE_INFINITY);
-            }
-            else if (operatorType.equals(MODULUS)) {
-                double maxDivisor = max(abs(rightLow), abs(rightHigh));
-                if (leftHigh <= 0) {
-                    result.setLowValue(max(-maxDivisor, leftLow))
-                            .setHighValue(0);
-                }
-                else if (leftLow >= 0) {
-                    result.setLowValue(0)
-                            .setHighValue(min(maxDivisor, leftHigh));
-                }
-                else {
-                    result.setLowValue(max(-maxDivisor, leftLow))
-                            .setHighValue(min(maxDivisor, leftHigh));
-                }
-            }
-            else {
-                double v1 = operate(operatorType, leftLow, rightLow);
-                double v2 = operate(operatorType, leftLow, rightHigh);
-                double v3 = operate(operatorType, leftHigh, rightLow);
-                double v4 = operate(operatorType, leftHigh, rightHigh);
-                double lowValue = min(v1, v2, v3, v4);
-                double highValue = max(v1, v2, v3, v4);
-
-                result.setLowValue(lowValue)
-                        .setHighValue(highValue);
-            }
-
-            return result.build();
-        }
-
-        private double operate(OperatorType operator, double left, double right)
-        {
-            switch (operator) {
-                case ADD:
-                    return left + right;
-                case SUBTRACT:
-                    return left - right;
-                case MULTIPLY:
-                    return left * right;
-                case DIVIDE:
-                    return left / right;
-                case MODULUS:
-                    return left % right;
-                default:
-                    throw new IllegalStateException("Unsupported ArithmeticBinaryExpression.Operator: " + operator);
-            }
         }
     }
 
@@ -405,7 +311,8 @@ public class ScalarStatsCalculator
             OptionalDouble doubleValue = toStatsRepresentation(metadata, session, type, value);
             VariableStatsEstimate.Builder estimate = VariableStatsEstimate.builder()
                     .setNullsFraction(0)
-                    .setDistinctValuesCount(1);
+                    .setDistinctValuesCount(1)
+                    .setAverageRowSize(getTypeWidth(type));
 
             if (doubleValue.isPresent()) {
                 estimate.setLowValue(doubleValue.getAsDouble());
@@ -596,10 +503,10 @@ public class ScalarStatsCalculator
     private static VariableStatsEstimate estimateCoalesce(PlanNodeStatsEstimate input, VariableStatsEstimate left, VariableStatsEstimate right)
     {
         // Question to reviewer: do you have a method to check if fraction is empty or saturated?
-        if (left.getNullsFraction() == 0) {
+        if (nearlyEqual(left.getNullsFraction(), 0, 0.00001)) {
             return left;
         }
-        else if (left.getNullsFraction() == 1.0) {
+        else if (nearlyEqual(left.getNullsFraction(), 1.0, 0.00001)) {
             return right;
         }
         else {

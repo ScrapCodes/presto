@@ -17,6 +17,7 @@ import com.facebook.presto.common.block.Block;
 import com.facebook.presto.common.type.StandardTypes;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.ScalarFunction;
+import com.facebook.presto.spi.function.ScalarFunctionConstantStats;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.function.TypeParameter;
 
@@ -28,6 +29,7 @@ public final class ArrayCardinalityFunction
 
     @TypeParameter("E")
     @SqlType(StandardTypes.BIGINT)
+    @ScalarFunctionConstantStats(minValue = 0)
     public static long arrayCardinality(@SqlType("array(E)") Block block)
     {
         return block.getPositionCount();
