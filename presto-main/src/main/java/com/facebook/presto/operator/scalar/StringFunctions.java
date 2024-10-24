@@ -43,10 +43,8 @@ import static com.facebook.presto.common.type.Chars.padSpaces;
 import static com.facebook.presto.common.type.Chars.trimTrailingSpaces;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
-import static com.facebook.presto.spi.function.StatsPropagationBehavior.CONDITIONALLY_USE_SOURCE_STATS;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.MAX_TYPE_WIDTH_VARCHAR;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.NON_NULL_ROW_COUNT;
-import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUBSTR_ROW_SIZE;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUM_ARGUMENTS;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.USE_MAX_ARGUMENT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.USE_SOURCE_STATS;
@@ -341,11 +339,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
-    public static Slice substr(
-            @ScalarPropagateSourceStats(
-                    nullFraction = USE_SOURCE_STATS,
-                    distinctValuesCount = CONDITIONALLY_USE_SOURCE_STATS,
-                    avgRowSize = SUBSTR_ROW_SIZE) @SqlType("varchar(x)") Slice utf8,
+    public static Slice substr(@SqlType("varchar(x)") Slice utf8,
             @SqlType(StandardTypes.BIGINT) long start)
     {
         if ((start == 0) || utf8.length() == 0) {
@@ -384,11 +378,7 @@ public final class StringFunctions
     @ScalarFunction("substr")
     @LiteralParameters("x")
     @SqlType("char(x)")
-    public static Slice charSubstr(
-            @ScalarPropagateSourceStats(
-                    nullFraction = USE_SOURCE_STATS,
-                    distinctValuesCount = CONDITIONALLY_USE_SOURCE_STATS,
-                    avgRowSize = SUBSTR_ROW_SIZE) @SqlType("char(x)") Slice utf8,
+    public static Slice charSubstr(@SqlType("char(x)") Slice utf8,
             @SqlType(StandardTypes.BIGINT) long start)
     {
         return substr(utf8, start);
@@ -398,11 +388,7 @@ public final class StringFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @SqlType("varchar(x)")
-    public static Slice substr(
-            @ScalarPropagateSourceStats(
-                    nullFraction = USE_SOURCE_STATS,
-                    distinctValuesCount = CONDITIONALLY_USE_SOURCE_STATS,
-                    avgRowSize = SUBSTR_ROW_SIZE) @SqlType("varchar(x)") Slice utf8,
+    public static Slice substr(@SqlType("varchar(x)") Slice utf8,
             @SqlType(StandardTypes.BIGINT) long start,
             @SqlType(StandardTypes.BIGINT) long length)
     {
@@ -453,11 +439,7 @@ public final class StringFunctions
     @ScalarFunction("substr")
     @LiteralParameters("x")
     @SqlType("char(x)")
-    public static Slice charSubstr(
-            @ScalarPropagateSourceStats(
-                    nullFraction = USE_SOURCE_STATS,
-                    distinctValuesCount = CONDITIONALLY_USE_SOURCE_STATS,
-                    avgRowSize = SUBSTR_ROW_SIZE) @SqlType("char(x)") Slice utf8,
+    public static Slice charSubstr(@SqlType("char(x)") Slice utf8,
             @SqlType(StandardTypes.BIGINT) long start,
             @SqlType(StandardTypes.BIGINT) long length)
     {

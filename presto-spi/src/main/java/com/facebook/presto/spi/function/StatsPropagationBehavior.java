@@ -27,10 +27,6 @@ public enum StatsPropagationBehavior
     USE_MIN_ARGUMENT,
     /** Sum the stats value of all arguments to derive the new stats value */
     SUM_ARGUMENTS,
-    /** Sum the stats value of all arguments to derive the new stats value, but upper bounded to row count. */
-    SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT,
-    /** Propagate source stat if source distinct values count is less than 1% of row count */
-    CONDITIONALLY_USE_SOURCE_STATS,
     /** Propagate the source stats as-is */
     USE_SOURCE_STATS,
     /** calculate logarithm with base 10 of the arguments source stats */
@@ -48,8 +44,6 @@ public enum StatsPropagationBehavior
     USE_TYPE_WIDTH_VARCHAR,
     /** Take max of type width of arguments with varchar type. */
     MAX_TYPE_WIDTH_VARCHAR,
-    /** Special case for estimating row size for substr function. */
-    SUBSTR_ROW_SIZE,
     /** Stats are unknown and thus no action is performed. */
     UNKNOWN;
     /*
@@ -57,10 +51,10 @@ public enum StatsPropagationBehavior
      */
     private static final Set<StatsPropagationBehavior> MULTI_ARGUMENT_STATS =
             unmodifiableSet(
-                    new HashSet<>(Arrays.asList(MAX_TYPE_WIDTH_VARCHAR, USE_MAX_ARGUMENT, USE_MIN_ARGUMENT, SUM_ARGUMENTS, SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT)));
+                    new HashSet<>(Arrays.asList(MAX_TYPE_WIDTH_VARCHAR, USE_MAX_ARGUMENT, USE_MIN_ARGUMENT, SUM_ARGUMENTS)));
     private static final Set<StatsPropagationBehavior> SOURCE_STATS_DEPENDENT_STATS =
             unmodifiableSet(
-                    new HashSet<>(Arrays.asList(USE_MAX_ARGUMENT, USE_MIN_ARGUMENT, SUM_ARGUMENTS, SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT, USE_SOURCE_STATS)));
+                    new HashSet<>(Arrays.asList(USE_MAX_ARGUMENT, USE_MIN_ARGUMENT, SUM_ARGUMENTS, USE_SOURCE_STATS)));
 
     public static final class Constants
     {

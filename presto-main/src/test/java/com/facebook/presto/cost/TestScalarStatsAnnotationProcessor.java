@@ -45,7 +45,6 @@ import static com.facebook.presto.spi.function.StatsPropagationBehavior.MAX_TYPE
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.NON_NULL_ROW_COUNT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.ROW_COUNT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUM_ARGUMENTS;
-import static com.facebook.presto.spi.function.StatsPropagationBehavior.SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.UNKNOWN;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.USE_MAX_ARGUMENT;
 import static com.facebook.presto.spi.function.StatsPropagationBehavior.USE_MIN_ARGUMENT;
@@ -161,7 +160,7 @@ public class TestScalarStatsAnnotationProcessor
                 CONSTANT_STATS_UNKNOWN,
                 ImmutableMap.of(1, createScalarPropagateSourceStatsInstance(false,
                         USE_MIN_ARGUMENT, SUM_ARGUMENTS, SUM_ARGUMENTS, SUM_ARGUMENTS,
-                        SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT)));
+                        USE_MAX_ARGUMENT)));
         VariableStatsEstimate actualStats =
                 computeStatsFromAnnotations(callExpression, ImmutableList.of(statsEstimateLarge, statsEstimateLarge), scalarStatsHeader, Double.MAX_VALUE - 1);
         VariableStatsEstimate expectedStats = VariableStatsEstimate

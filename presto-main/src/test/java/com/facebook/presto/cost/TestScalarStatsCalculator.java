@@ -56,6 +56,9 @@ import java.util.Optional;
 import static com.facebook.presto.SystemSessionProperties.SCALAR_FUNCTION_STATS_PROPAGATION_ENABLED;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
 import static com.facebook.presto.common.type.DoubleType.DOUBLE;
+import static com.facebook.presto.common.type.IntegerType.INTEGER;
+import static com.facebook.presto.common.type.SmallintType.SMALLINT;
+import static com.facebook.presto.common.type.TinyintType.TINYINT;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.common.type.VarcharType.createVarcharType;
@@ -133,7 +136,7 @@ public class TestScalarStatsCalculator
                 expression("custom_add(x, y)"),
                 TWO_ARGUMENTS_BIGINT_SOURCE_STATS,
                 TypeProvider.viewOf(TWO_ARGUMENTS_BIGINT_NAME_TO_TYPE_MAP))
-                .distinctValuesCount(7)
+                .distinctValuesCount(4)
                 .lowValue(-3)
                 .highValue(15)
                 .nullsFraction(0.3)
@@ -359,48 +362,56 @@ public class TestScalarStatsCalculator
     public void testLiteral()
     {
         assertCalculate(new GenericLiteral("TINYINT", "7"))
+                .averageRowSize(TINYINT.getFixedSize())
                 .distinctValuesCount(1.0)
                 .lowValue(7)
                 .highValue(7)
                 .nullsFraction(0.0);
 
         assertCalculate(new GenericLiteral("SMALLINT", "8"))
+                .averageRowSize(SMALLINT.getFixedSize())
                 .distinctValuesCount(1.0)
                 .lowValue(8)
                 .highValue(8)
                 .nullsFraction(0.0);
 
         assertCalculate(new GenericLiteral("INTEGER", "9"))
+                .averageRowSize(INTEGER.getFixedSize())
                 .distinctValuesCount(1.0)
                 .lowValue(9)
                 .highValue(9)
                 .nullsFraction(0.0);
 
         assertCalculate(new GenericLiteral("BIGINT", Long.toString(Long.MAX_VALUE)))
+                .averageRowSize(BIGINT.getFixedSize())
                 .distinctValuesCount(1.0)
                 .lowValue(Long.MAX_VALUE)
                 .highValue(Long.MAX_VALUE)
                 .nullsFraction(0.0);
 
         assertCalculate(new DoubleLiteral("7.5"))
+                .averageRowSize(DOUBLE.getFixedSize())
                 .distinctValuesCount(1.0)
                 .lowValue(7.5)
                 .highValue(7.5)
                 .nullsFraction(0.0);
 
         assertCalculate(new DecimalLiteral("75.5"))
+                .averageRowSize(8)
                 .distinctValuesCount(1.0)
                 .lowValue(75.5)
                 .highValue(75.5)
                 .nullsFraction(0.0);
 
         assertCalculate(new StringLiteral("blah"))
+                .averageRowSize(4)
                 .distinctValuesCount(1.0)
                 .lowValueUnknown()
                 .highValueUnknown()
                 .nullsFraction(0.0);
 
         assertCalculate(new NullLiteral())
+                .dataSizeUnknown()
                 .distinctValuesCount(0.0)
                 .lowValueUnknown()
                 .highValueUnknown()
@@ -845,7 +856,7 @@ public class TestScalarStatsCalculator
                 @ScalarPropagateSourceStats(
                         propagateAllStats = false,
                         nullFraction = StatsPropagationBehavior.SUM_ARGUMENTS,
-                        distinctValuesCount = StatsPropagationBehavior.SUM_ARGUMENTS_UPPER_BOUNDED_TO_ROW_COUNT,
+                        distinctValuesCount = StatsPropagationBehavior.USE_MAX_ARGUMENT,
                         minValue = StatsPropagationBehavior.SUM_ARGUMENTS,
                         maxValue = StatsPropagationBehavior.SUM_ARGUMENTS) @SqlType(StandardTypes.BIGINT) long x,
                 @SqlType(StandardTypes.BIGINT) long y)
