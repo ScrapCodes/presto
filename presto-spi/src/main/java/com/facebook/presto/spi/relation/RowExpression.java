@@ -56,7 +56,7 @@ public abstract class RowExpression
         return sourceLocation;
     }
 
-    public String toSQL(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    public String toSQL(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     {
         return null;
     }

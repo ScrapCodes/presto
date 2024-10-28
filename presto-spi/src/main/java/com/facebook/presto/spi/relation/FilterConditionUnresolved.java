@@ -29,11 +29,10 @@ public class FilterConditionUnresolved
     public FilterConditionUnresolved(RowExpression conditionExpression)
     {
         this.conditionExpression = conditionExpression;
-//        this.table = table;
     }
 
     @Override
-    public Condition resolveAlias(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    public Condition resolveAlias(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     {
         return new FilterCondition(this.conditionExpression.toSQL(aliasToColumnMap));
     }

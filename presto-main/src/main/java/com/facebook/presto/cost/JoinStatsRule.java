@@ -20,7 +20,7 @@ import com.facebook.presto.spi.relation.Condition;
 import com.facebook.presto.spi.relation.JoinCondition;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
-import com.facebook.presto.spi.statistics.MLBasedSourceInfo;
+import com.facebook.presto.spi.statistics.SamplingBasedSourceInfo;
 import com.facebook.presto.spi.statistics.SourceInfo;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.iterative.Lookup;
@@ -107,8 +107,13 @@ public class JoinStatsRule
                 estimate = joinStatsUsingML(conditions, session.getMlStatsMap());
             }
         }
+//        if (!estimate.isOutputRowCountUnknown()) {
+//            estimate.setSourceInfo(new MLBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
+////            System.out.println(estimate.getOutputRowCount());
+//            return Optional.of(estimate);
+//        }
         if (!estimate.isOutputRowCountUnknown()) {
-            estimate.setSourceInfo(new MLBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
+            estimate.setSourceInfo(new SamplingBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
 //            System.out.println(estimate.getOutputRowCount());
             return Optional.of(estimate);
         }
@@ -151,9 +156,15 @@ public class JoinStatsRule
             return mlStatsMap.get(hashValue);
         }
         try {
-            PlanNodeStatsEstimate estimate = builder.setOutputRowCount(JDBC_SAMPLES_DB.estimatedRowCounts(filterPredicatesStr)).build();
-            mlStatsMap.put(hashValue, estimate);
-            return estimate;
+            List<Double> estimatedRowCounts = JDBC_SAMPLES_DB.estimatedRowCounts(filterPredicatesStr);
+            if (!estimatedRowCounts.isEmpty()) {
+                PlanNodeStatsEstimate estimate = builder.setOutputRowCount(estimatedRowCounts.get(0) * 100).build();
+                mlStatsMap.put(hashValue, estimate);
+                return estimate;
+            }
+            else {
+                return builder.build();
+            }
         }
         catch (Exception e) {
             e.printStackTrace();

@@ -18,7 +18,7 @@ import java.util.Map;
 public abstract class UnresolvedCondition
         extends Condition
 {
-    public Condition resolveAlias(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    public Condition resolveAlias(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     {
         return null;
     }

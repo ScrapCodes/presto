@@ -138,7 +138,7 @@ public class SpecialFormExpression
     }
 
     @Override
-    public String toSQL(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    public String toSQL(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     // todo: make sure the filter conditions are sorted in order
     {
         // for arguments: use form to combine all the arguments, recursively transform the argument to sql: if the argument is a

@@ -17,12 +17,19 @@ public class FilterCondition
         extends Condition
 {
     private final String resolvedCondition;
+    private final String table;
 
     public FilterCondition(String resolvedCondition)
     {
         this.resolvedCondition = resolvedCondition;
+        this.table = null;
     }
 
+    public FilterCondition(String resolvedCondition, String table)
+    {
+        this.resolvedCondition = resolvedCondition;
+        this.table = table;
+    }
 //    public String getTable()
 //    {
 //        return table;

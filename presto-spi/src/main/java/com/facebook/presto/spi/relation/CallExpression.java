@@ -22,10 +22,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.concurrent.Immutable;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.common.function.OperatorType.EQUAL;
@@ -45,6 +49,7 @@ public final class CallExpression
     private final FunctionHandle functionHandle;
     private final Type returnType;
     private final List<RowExpression> arguments;
+    private final Set<String> tableNames = new HashSet<>();
 
     public CallExpression(
             // The name here should only be used for display (toString)
@@ -54,9 +59,9 @@ public final class CallExpression
             List<RowExpression> arguments)
     {
         this(arguments.stream()
-                .filter(x -> x.getSourceLocation().isPresent())
-                .map(x -> x.getSourceLocation())
-                .findFirst().orElse(Optional.empty()),
+                        .filter(x -> x.getSourceLocation().isPresent())
+                        .map(x -> x.getSourceLocation())
+                        .findFirst().orElse(Optional.empty()),
                 displayName, functionHandle, returnType, arguments);
     }
 
@@ -113,8 +118,13 @@ public final class CallExpression
         return displayName + "(" + String.join(", ", arguments.stream().map(RowExpression::toString).collect(Collectors.toList())) + ")";
     }
 
+    public Set<String> getTableNames()
+    {
+        return Collections.unmodifiableSet(tableNames);
+    }
+
     @Override
-    public String toSQL(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    public String toSQL(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     {
         // TODO: the first argument is rowexpression, not column name
         // TODO: for now, assume it is a binary comparison
@@ -144,14 +154,23 @@ public final class CallExpression
             String rightOperand = null;
             RowExpression leftExpression = arguments.get(0);
             RowExpression rightExpression = arguments.get(1);
+            if (aliasToColumnMap.containsKey(leftExpression)) {
+                Map.Entry<String, String> tableToResolvedExpression = aliasToColumnMap.get(leftExpression).entrySet().stream().findFirst().get();
+                tableNames.add(tableToResolvedExpression.getKey());
+            }
+            if (aliasToColumnMap.containsKey(rightExpression)) {
+                Map.Entry<String, String> tableToResolvedExpression = aliasToColumnMap.get(rightExpression).entrySet().stream().findFirst().get();
+                tableNames.add(tableToResolvedExpression.getKey());
+            }
+
             if (leftExpression instanceof VariableReferenceExpression && aliasToColumnMap.containsKey(leftExpression)) {
-                leftOperand = aliasToColumnMap.get(leftExpression);
+                leftOperand = aliasToColumnMap.get(leftExpression).values().stream().findFirst().get();
             }
             if (leftExpression instanceof ConstantExpression) {
                 leftOperand = leftExpression.toString();
             }
             if (rightExpression instanceof VariableReferenceExpression && aliasToColumnMap.containsKey(rightExpression)) {
-                rightOperand = aliasToColumnMap.get(rightExpression);
+                rightOperand = aliasToColumnMap.get(rightExpression).values().stream().findFirst().get();
             }
             if (rightExpression instanceof ConstantExpression) {
                 rightOperand = rightExpression.toString();

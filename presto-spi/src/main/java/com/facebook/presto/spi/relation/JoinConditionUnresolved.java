@@ -39,10 +39,10 @@ public class JoinConditionUnresolved
     }
 
     @Override
-    public Condition resolveAlias(Map<VariableReferenceExpression, String> aliasToColumnMap)
+    public Condition resolveAlias(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     {
         if (aliasToColumnMap.containsKey(leftPredicate) && aliasToColumnMap.containsKey(rightPredicate)) {
-            return new JoinCondition(aliasToColumnMap.get(leftPredicate), aliasToColumnMap.get(rightPredicate));
+            return new JoinCondition(aliasToColumnMap.get(leftPredicate).values().stream().findFirst().get(), aliasToColumnMap.get(rightPredicate).values().stream().findFirst().get());
         }
         return null;
     }

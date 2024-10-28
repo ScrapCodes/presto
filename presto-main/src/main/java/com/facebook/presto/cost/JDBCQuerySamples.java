@@ -16,26 +16,28 @@ package com.facebook.presto.cost;
 
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.StandardErrorCode;
+import com.google.common.collect.ImmutableList;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 import static java.lang.Double.NaN;
 
 public class JDBCQuerySamples
 {
     private final Connection connection;
-    private final Statement statement;
 
     public JDBCQuerySamples(String jdbcUrl)
     {
         try {
             Class.forName("org.duckdb.DuckDBDriver");
             connection = DriverManager.getConnection(jdbcUrl);
-            statement = connection.createStatement();
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -43,16 +45,20 @@ public class JDBCQuerySamples
         }
     }
 
-    public double estimatedRowCounts(String query)
+    public List<Double> estimatedRowCounts(Set<String> tables, String query)
     {
-        try {
+        try (Statement statement = connection.createStatement()) {
             ResultSet resultSet = statement.executeQuery(query);
-            resultSet.afterLast();
-            return resultSet.getRow();
+            System.out.println("Executing query: " + query);
+            ImmutableList.Builder<Double> listBuilder = ImmutableList.builder();
+            if (resultSet.next()) {
+                listBuilder.add(resultSet.getDouble(1));
+            }
+            return listBuilder.build();
         }
         catch (SQLException e) {
             System.out.println("Error while executing query: " + query + " error: " + e.getMessage());
         }
-        return NaN;
+        return Collections.emptyList();
     }
 }

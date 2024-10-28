@@ -19,6 +19,7 @@ import com.facebook.presto.spi.plan.ProjectNode;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.spi.statistics.MLBasedSourceInfo;
+import com.facebook.presto.spi.statistics.SamplingBasedSourceInfo;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 
@@ -58,6 +59,9 @@ public class ProjectStatsRule
         boolean noChange = noChangeToSourceColumns(node);
         ConfidenceLevel newConfidence = noChange ? sourceStats.confidenceLevel() : LOW;
         if (sourceStats.getSourceInfo() instanceof MLBasedSourceInfo) {
+            newConfidence = HIGH;
+        }
+        if (sourceStats.getSourceInfo() instanceof SamplingBasedSourceInfo) {
             newConfidence = HIGH;
         }
         PlanNodeStatsEstimate.Builder calculatedStats = PlanNodeStatsEstimate.builder()

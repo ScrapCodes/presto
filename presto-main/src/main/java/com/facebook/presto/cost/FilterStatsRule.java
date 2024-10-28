@@ -18,7 +18,7 @@ import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.spi.plan.FilterNode;
 import com.facebook.presto.spi.plan.TableScanNode;
 import com.facebook.presto.spi.relation.Condition;
-import com.facebook.presto.spi.statistics.MLBasedSourceInfo;
+import com.facebook.presto.spi.statistics.SamplingBasedSourceInfo;
 import com.facebook.presto.spi.statistics.SourceInfo;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.iterative.GroupReference;
@@ -70,10 +70,14 @@ public class FilterStatsRule
                 }
             }
         }
+//
+//        if (!estimate.isOutputRowCountUnknown()) {
+//            estimate.setSourceInfo(new MLBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
+//            return Optional.of(estimate);
+//        }
 
         if (!estimate.isOutputRowCountUnknown()) {
-            estimate.setSourceInfo(new MLBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
-//            System.out.println(estimate.getOutputRowCount());
+            estimate.setSourceInfo(new SamplingBasedSourceInfo(SourceInfo.ConfidenceLevel.HIGH));
             return Optional.of(estimate);
         }
         PlanNodeStatsEstimate sourceStats = statsProvider.getStats(node.getSource());

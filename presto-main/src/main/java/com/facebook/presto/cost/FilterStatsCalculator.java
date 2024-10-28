@@ -108,7 +108,7 @@ public class FilterStatsCalculator
     private final StatsNormalizer normalizer;
     private final LiteralEncoder literalEncoder;
     private final FunctionResolution functionResolution;
-    public static final JDBCQuerySamples JDBC_SAMPLES_DB = new JDBCQuerySamples("jdbc:duckdb:/Users/prashantsharma/work/prestodb/duckdb_imdb.db");
+    public static final JDBCQuerySamples JDBC_SAMPLES_DB = new JDBCQuerySamples("jdbc:duckdb:/drive1/prestodb/duckdb_imdb.db");
 
     @Inject
     public FilterStatsCalculator(Metadata metadata, ScalarStatsCalculator scalarStatsCalculator, StatsNormalizer normalizer)
@@ -166,7 +166,10 @@ public class FilterStatsCalculator
             return mlStatsMap.get(hashValue);
         }
         try {
-            builder.setOutputRowCount(JDBC_SAMPLES_DB.estimatedRowCounts(filterPredicatesStr));
+            List<Double> estimatedStatsViaSampling = JDBC_SAMPLES_DB.estimatedRowCounts(filterPredicatesStr);
+            if (!estimatedStatsViaSampling.isEmpty()) {
+                builder.setOutputRowCount(estimatedStatsViaSampling.get(0) * 100);
+            }
             PlanNodeStatsEstimate nodeStatsEstimate = builder.build();
             mlStatsMap.put(hashValue, nodeStatsEstimate);
             return nodeStatsEstimate;

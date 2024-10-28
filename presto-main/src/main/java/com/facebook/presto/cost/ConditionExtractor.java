@@ -27,11 +27,13 @@ import com.facebook.presto.sql.planner.SimplePlanVisitor;
 import com.facebook.presto.sql.planner.iterative.GroupReference;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.JoinNode;
+import com.google.common.collect.ImmutableMap;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import static com.facebook.presto.sql.planner.iterative.Plans.resolveGroupReferences;
 
@@ -62,7 +64,7 @@ public class ConditionExtractor
     public static class Context
     {
         List<Condition> conditions = new ArrayList<>();
-        Map<VariableReferenceExpression, String> aliasToColumnMap = new HashMap<>();
+        Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap = new HashMap<>();
         List<UnresolvedCondition> unresolvedConditions = new ArrayList<>();
 
         public List<Condition> getConditions()
@@ -70,7 +72,7 @@ public class ConditionExtractor
             return conditions;
         }
 
-        public Map<VariableReferenceExpression, String> getAliasToColumnMap()
+        public Map<VariableReferenceExpression, Map<String, String>> getAliasToColumnMap()
         {
             return aliasToColumnMap;
         }
@@ -89,7 +91,7 @@ public class ConditionExtractor
         {
             List<UnresolvedCondition> resolvedConditions = new ArrayList<>();
             for (UnresolvedCondition unresolved : unresolvedConditions) {
-                Condition condition = unresolved.resolveAlias((aliasToColumnMap));
+                Condition condition = unresolved.resolveAlias(aliasToColumnMap);
                 if (condition != null) {
                     resolvedConditions.add(unresolved);
                     conditions.add(condition);
@@ -150,13 +152,13 @@ public class ConditionExtractor
         {
             Map<VariableReferenceExpression, ColumnHandle> assignments = node.getAssignments();
             String table = node.getTable().getConnectorHandle().getTableName().toString();
-            for (Map.Entry<VariableReferenceExpression, ColumnHandle> entry : assignments.entrySet()) {
+            for (Entry<VariableReferenceExpression, ColumnHandle> entry : assignments.entrySet()) {
                 VariableReferenceExpression variable = entry.getKey();
                 ColumnHandle columnHandle = entry.getValue();
                 // todo: add a function to get table and col real name from the columnHandle.
                 String tableColumn = resolveTableColumn(table, columnHandle);
                 // Map alias to real table column
-                context.getAliasToColumnMap().put(variable, tableColumn);
+                context.getAliasToColumnMap().put(variable, ImmutableMap.of(table, tableColumn));
             }
             return null;
         }
