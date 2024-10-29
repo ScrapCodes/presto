@@ -34,6 +34,10 @@ public class FilterConditionUnresolved
     @Override
     public Condition resolveAlias(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     {
-        return new FilterCondition(this.conditionExpression.toSQL(aliasToColumnMap));
+        RowExpression conditionExpression1 = this.conditionExpression;
+        if (conditionExpression1 instanceof CallExpression) {
+            return new FilterCondition(conditionExpression1.toSQL(aliasToColumnMap), ((CallExpression) conditionExpression1).getTableNames());
+        }
+        return new FilterCondition(conditionExpression1.toSQL(aliasToColumnMap));
     }
 }

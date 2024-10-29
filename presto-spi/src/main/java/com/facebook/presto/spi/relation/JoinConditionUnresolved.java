@@ -13,7 +13,11 @@
  */
 package com.facebook.presto.spi.relation;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class JoinConditionUnresolved
         extends UnresolvedCondition
@@ -21,6 +25,7 @@ public class JoinConditionUnresolved
     // for JoinNode, extract each Join condition
     private final VariableReferenceExpression leftPredicate;
     private final VariableReferenceExpression rightPredicate;
+    private final Set<String> tableNames = new HashSet<>();
 
     public JoinConditionUnresolved(VariableReferenceExpression leftPredicate, VariableReferenceExpression rightPredicate)
     {
@@ -42,7 +47,11 @@ public class JoinConditionUnresolved
     public Condition resolveAlias(Map<VariableReferenceExpression, Map<String, String>> aliasToColumnMap)
     {
         if (aliasToColumnMap.containsKey(leftPredicate) && aliasToColumnMap.containsKey(rightPredicate)) {
-            return new JoinCondition(aliasToColumnMap.get(leftPredicate).values().stream().findFirst().get(), aliasToColumnMap.get(rightPredicate).values().stream().findFirst().get());
+            String tableFromLeftPredicate = aliasToColumnMap.get(leftPredicate).keySet().stream().findFirst().get();
+            String tableFromRightPredicate = aliasToColumnMap.get(rightPredicate).keySet().stream().findFirst().get();
+            return new JoinCondition(aliasToColumnMap.get(leftPredicate).values().stream().findFirst().get(),
+                    aliasToColumnMap.get(rightPredicate).values().stream().findFirst().get(),
+                    Collections.unmodifiableSet(new HashSet<>(Arrays.asList(tableFromLeftPredicate, tableFromRightPredicate))));
         }
         return null;
     }

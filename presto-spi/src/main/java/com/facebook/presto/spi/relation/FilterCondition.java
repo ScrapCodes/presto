@@ -13,27 +13,30 @@
  */
 package com.facebook.presto.spi.relation;
 
+import java.util.Set;
+
 public class FilterCondition
         extends Condition
 {
     private final String resolvedCondition;
-    private final String table;
+    private final Set<String> tables;
 
     public FilterCondition(String resolvedCondition)
     {
         this.resolvedCondition = resolvedCondition;
-        this.table = null;
+        this.tables = null;
     }
 
-    public FilterCondition(String resolvedCondition, String table)
+    public FilterCondition(String resolvedCondition, Set<String> tables)
     {
         this.resolvedCondition = resolvedCondition;
-        this.table = table;
+        this.tables = tables;
     }
-//    public String getTable()
-//    {
-//        return table;
-//    }
+
+    public Set<String> getTables()
+    {
+        return tables;
+    }
 
     @Override
     public String toSQL()

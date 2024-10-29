@@ -17,6 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.spi.plan.EquiJoinClause;
 import com.facebook.presto.spi.relation.Condition;
+import com.facebook.presto.spi.relation.FilterCondition;
 import com.facebook.presto.spi.relation.JoinCondition;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
@@ -32,19 +33,20 @@ import com.google.common.annotations.VisibleForTesting;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.SystemSessionProperties.getDefaultJoinSelectivityCoefficient;
 import static com.facebook.presto.SystemSessionProperties.shouldOptimizerUseHistograms;
 import static com.facebook.presto.SystemSessionProperties.useMLBasedStatisticsEnabled;
 import static com.facebook.presto.cost.DisjointRangeDomainHistogram.addConjunction;
-import static com.facebook.presto.cost.FilterStatsCalculator.JDBC_SAMPLES_DB;
 import static com.facebook.presto.cost.FilterStatsCalculator.UNKNOWN_FILTER_COEFFICIENT;
 import static com.facebook.presto.cost.VariableStatsEstimate.buildFrom;
 import static com.facebook.presto.expressions.LogicalRowExpressions.extractConjuncts;
@@ -139,32 +141,44 @@ public class JoinStatsRule
         PlanNodeStatsEstimate.Builder builder = PlanNodeStatsEstimate.builder();
         List<String> filterPredicates = new ArrayList<>();
         List<String> joinPredicates = new ArrayList<>();
+        Set<String> tables = new HashSet<>();
         for (Condition condition : conditions) {
             if (condition instanceof JoinCondition) {
                 joinPredicates.add(condition.toSQL());
+                Set<String> tables1 = ((JoinCondition) condition).getTables();
+                if (tables1 != null) {
+                    // tables.addAll(tables1);
+                }
             }
-            else {
+            else if (condition instanceof FilterCondition) {
                 filterPredicates.add(condition.toSQL());
+                Set<String> tables1 = ((FilterCondition) condition).getTables();
+                if (tables1 != null) {
+                    tables.addAll(tables1);
+                }
             }
         }
         // todo: this assumes that the filter predicates are
         //  all connected by AND. this joins the different table's filter conditions
         String filterPredicatesStr = filterPredicates.stream().sorted().collect(Collectors.joining(" AND "));
+        if (!filterPredicates.isEmpty()) {
+            // joinPredicates.addAll(filterPredicates);
+        }
         String joinPredicatesStr = joinPredicates.stream().sorted().collect(Collectors.joining(" AND "));
         Integer hashValue = Objects.hash(filterPredicatesStr, joinPredicatesStr);
-        if (mlStatsMap.containsKey(hashValue)) {
-            return mlStatsMap.get(hashValue);
-        }
-        try {
-            List<Double> estimatedRowCounts = JDBC_SAMPLES_DB.estimatedRowCounts(filterPredicatesStr);
-            if (!estimatedRowCounts.isEmpty()) {
-                PlanNodeStatsEstimate estimate = builder.setOutputRowCount(estimatedRowCounts.get(0) * 100).build();
-                mlStatsMap.put(hashValue, estimate);
-                return estimate;
-            }
-            else {
-                return builder.build();
-            }
+//        if (mlStatsMap.containsKey(hashValue)) {
+//            return mlStatsMap.get(hashValue);
+//        }
+        try { // TODO: prashant, Turning off join stats rule.
+//            List<Double> estimatedRowCounts = JDBC_SAMPLES_DB.estimatedRowCounts(tables, filterPredicatesStr);
+//            if (!estimatedRowCounts.isEmpty()) {
+//                PlanNodeStatsEstimate estimate = builder.setOutputRowCount(estimatedRowCounts.get(0) * 100).build();
+//                mlStatsMap.put(hashValue, estimate);
+//                return estimate;
+//            }
+//            else {
+            return builder.build();
+            // }
         }
         catch (Exception e) {
             e.printStackTrace();

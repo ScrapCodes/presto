@@ -13,16 +13,31 @@
  */
 package com.facebook.presto.spi.relation;
 
+import java.util.Set;
+
 public class JoinCondition
         extends Condition
 {
     private final String leftElement;
     private final String rightElement;
+    private Set<String> tables;
 
     public JoinCondition(String leftElement, String rightElement)
     {
         this.leftElement = leftElement;
         this.rightElement = rightElement;
+    }
+
+    public JoinCondition(String leftElement, String rightElement, Set<String> tables)
+    {
+        this.leftElement = leftElement;
+        this.rightElement = rightElement;
+        this.tables = tables;
+    }
+
+    public Set<String> getTables()
+    {
+        return tables;
     }
 
     @Override

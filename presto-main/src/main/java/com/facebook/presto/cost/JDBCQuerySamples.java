@@ -27,8 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import static java.lang.Double.NaN;
-
 public class JDBCQuerySamples
 {
     private final Connection connection;
@@ -47,17 +45,20 @@ public class JDBCQuerySamples
 
     public List<Double> estimatedRowCounts(Set<String> tables, String query)
     {
-        try (Statement statement = connection.createStatement()) {
-            ResultSet resultSet = statement.executeQuery(query);
-            System.out.println("Executing query: " + query);
-            ImmutableList.Builder<Double> listBuilder = ImmutableList.builder();
-            if (resultSet.next()) {
-                listBuilder.add(resultSet.getDouble(1));
+        if (tables != null) {
+            try (Statement statement = connection.createStatement()) {
+                String sql = "SELECT COUNT(*) FROM " + String.join(",", tables) + " WHERE " + query;
+                ResultSet resultSet = statement.executeQuery(sql);
+                System.out.println("Executing query: " + sql);
+                ImmutableList.Builder<Double> listBuilder = ImmutableList.builder();
+                if (resultSet.next()) {
+                    listBuilder.add(resultSet.getDouble(1));
+                }
+                return listBuilder.build();
             }
-            return listBuilder.build();
-        }
-        catch (SQLException e) {
-            System.out.println("Error while executing query: " + query + " error: " + e.getMessage());
+            catch (SQLException e) {
+                System.out.println("Error while executing query: " + query + " error: " + e.getMessage());
+            }
         }
         return Collections.emptyList();
     }

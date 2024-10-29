@@ -29,9 +29,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.common.function.OperatorType.BETWEEN;
 import static com.facebook.presto.common.function.OperatorType.EQUAL;
 import static com.facebook.presto.common.function.OperatorType.GREATER_THAN;
 import static com.facebook.presto.common.function.OperatorType.GREATER_THAN_OR_EQUAL;
@@ -148,6 +148,9 @@ public final class CallExpression
         }
         else if (displayName.equals(NOT_EQUAL.name())) {
             ope = NOT_EQUAL.getOperator();
+        }
+        else if (displayName.equals(BETWEEN.name())) {
+            ope = BETWEEN.getOperator();
         }
         if (ope != null) {
             String leftOperand = null;
