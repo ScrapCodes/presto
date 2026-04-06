@@ -36,6 +36,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.statistics.ColumnStatistics;
 import com.facebook.presto.spi.statistics.DoubleRange;
 import com.facebook.presto.spi.statistics.Estimate;
+import com.facebook.presto.spi.statistics.StringRange;
 import com.facebook.presto.spi.statistics.TableStatistics;
 import com.google.common.collect.Maps;
 import jakarta.inject.Inject;
@@ -198,21 +199,28 @@ public class OracleClient
                     String columnName = resultSetColumnStats.getString("COLUMN_NAME");
                     double nullsCount = resultSetColumnStats.getDouble("NUM_NULLS");
                     double ndv = resultSetColumnStats.getDouble("NUM_DISTINCT");
-                    // Oracle stores low and high values as RAW(1000) i.e. a byte array. No way to unwrap it, without a clue about the underlying type
-                    // So we use column type as a clue and parse to double by converting as string first.
-                    double lowValue = toDouble(resultSetColumnStats.getString("LOW_VALUE"));
-                    double highValue = toDouble(resultSetColumnStats.getString("HIGH_VALUE"));
                     ColumnStatistics.Builder columnStatisticsBuilder = ColumnStatistics.builder()
                             .setNullsFraction(Estimate.estimateFromDouble(nullsCount / numRows))
                             .setDistinctValuesCount(Estimate.estimateFromDouble(ndv));
-                    if (resultSetColumnStats.getString("DATA_TYPE").startsWith("VARCHAR") ||
-                            resultSetColumnStats.getString("DATA_TYPE").startsWith("CHAR")) {
+                    String colDataType = resultSetColumnStats.getString("DATA_TYPE");
+                    if (colDataType.startsWith("VARCHAR") || colDataType.startsWith("CHAR")) {
+                        String lowValue = resultSetColumnStats.getString("LOW_VALUE");
+                        String highValue = resultSetColumnStats.getString("HIGH_VALUE");
+                        if (!lowValue.isEmpty() && !highValue.isEmpty()) {
+                            columnStatisticsBuilder.setStringRange(new StringRange(lowValue, highValue));
+                        }
+                    }
+                    else {
+                        double lowValue = toDouble(resultSetColumnStats.getString("LOW_VALUE"));
+                        double highValue = toDouble(resultSetColumnStats.getString("HIGH_VALUE"));
+                        if (Double.isFinite(lowValue) && Double.isFinite(highValue)) {
+                            columnStatisticsBuilder.setRange(new DoubleRange(lowValue, highValue));
+                        }
+                    }
+                    if (colDataType.startsWith("VARCHAR") || colDataType.startsWith("CHAR")) {
                         columnStatisticsBuilder.setDataSize(Estimate.estimateFromDouble(resultSetColumnStats.getDouble("DATA_LENGTH")));
                     }
                     ColumnStatistics columnStatistics = columnStatisticsBuilder.build();
-                    if (Double.isFinite(lowValue) && Double.isFinite(highValue)) {
-                        columnStatistics = columnStatisticsBuilder.setRange(new DoubleRange(lowValue, highValue)).build();
-                    }
                     columnStatisticsMap.put(columnHandleMap.get(columnName), columnStatistics);
                 }
                 LOG.info("getTableStatics for table: %s.%s.%s with last analyzed: %s",
@@ -238,11 +246,17 @@ public class OracleClient
                         "NUM_DISTINCT,\n" +
                         "DENSITY,\n" +
                         "CASE DATA_TYPE\n" +
+                        // Oracle stores low and high values as RAW(1000) i.e. a byte array, they have
+                        // to be converted using UTL_RAW.CAST_TO_NUMBER
                         "   WHEN 'NUMBER'   THEN TO_CHAR(UTL_RAW.CAST_TO_NUMBER(LOW_VALUE))\n" +
+                        "   WHEN 'CHAR'     THEN TO_CHAR(UTL_RAW.CAST_TO_VARCHAR2(LOW_VALUE))\n" +
+                        "   WHEN 'VARCHAR2' THEN TO_CHAR(UTL_RAW.CAST_TO_VARCHAR2(LOW_VALUE))\n" +
                         "   ELSE NULL\n" +
                         "END AS LOW_VALUE,\n" +
                         "CASE DATA_TYPE\n" +
                         "   WHEN 'NUMBER'   THEN TO_CHAR(UTL_RAW.CAST_TO_NUMBER(HIGH_VALUE))\n" +
+                        "   WHEN 'CHAR'     THEN TO_CHAR(UTL_RAW.CAST_TO_VARCHAR2(HIGH_VALUE))\n" +
+                        "   WHEN 'VARCHAR2' THEN TO_CHAR(UTL_RAW.CAST_TO_VARCHAR2(HIGH_VALUE))\n" +
                         "   ELSE NULL\n" +
                         "END AS HIGH_VALUE\n" +
                         "FROM ALL_TAB_COLUMNS\n" +
@@ -256,8 +270,6 @@ public class OracleClient
             return Double.parseDouble(number);
         }
         catch (Exception e) {
-            // a string represented by number, may not even be a parseable number this is expected. e.g. if column type is
-            // varchar.
             LOG.debug(e, "error while decoding : %s", number);
         }
         return NaN;
@@ -302,7 +314,7 @@ public class OracleClient
             case Types.VARCHAR:
                 return Optional.of(varcharReadMapping(createVarcharType(columnSize)));
 
-             /* Note: In Oracle, DATE and TIMESTAMP values are internally stored in the format YYYYMMDD HH24MISS.
+            /* Note: In Oracle, DATE and TIMESTAMP values are internally stored in the format YYYYMMDD HH24MISS.
              * When reading from Oracle to Presto, TIMESTAMP mappings must be used to interpret the values correctly.
              * Official documentation: https://docs.oracle.com/en/database/oracle/oracle-database/26/nlspg/datetime-data-types-and-time-zone-support.html#GUID-4D95F6B2-8F28-458A-820D-6C05F848CA23 */
             case Types.DATE:
