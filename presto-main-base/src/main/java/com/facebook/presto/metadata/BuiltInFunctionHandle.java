@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.metadata.BuiltInFunctionKind.ENGINE;
 import static java.util.Objects.requireNonNull;
@@ -113,5 +114,13 @@ public class BuiltInFunctionHandle
         if (!condition) {
             throw new IllegalArgumentException(String.format(message, args));
         }
+    }
+
+    @Override
+    public BuiltInFunctionHandle canonicalize()
+    {
+        List<TypeSignature> arguments = signature.getArgumentTypes().stream().map(type -> TypeSignature.parseTypeSignature(type.getBase())).collect(Collectors.toList());
+        SignatureBuilder signatureBuilder = new SignatureBuilder().from(this.signature).argumentTypes(arguments).returnType(TypeSignature.parseTypeSignature(signature.getReturnType().getBase()));
+        return new BuiltInFunctionHandle(signatureBuilder.build(), this.builtInFunctionKind);
     }
 }

@@ -11,29 +11,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spi.function;
+package com.facebook.presto.iceberg.derivedColumn;
 
-import com.facebook.presto.common.CatalogSchemaName;
-import com.facebook.presto.common.type.TypeSignature;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
-/**
- * FunctionHandle is a unique handle to identify the function implementation from namespaces.
- * However, currently it is still under changes, so please don't assume it is backward compatible.
- */
-public interface FunctionHandle
+public class DerivedColumnUDFSpecList
 {
-    CatalogSchemaName getCatalogSchemaName();
+    private final List<DerivedColumnUDFSpec> udfSpecList;
 
-    String getName();
-
-    FunctionKind getKind();
-
-    List<TypeSignature> getArgumentTypes();
-
-    default FunctionHandle canonicalize()
+    @JsonCreator
+    public DerivedColumnUDFSpecList(@JsonProperty("udfSpecList") List<DerivedColumnUDFSpec> udfSpecList)
     {
-        return this;
+        this.udfSpecList = udfSpecList;
+    }
+
+    @JsonProperty
+    public List<DerivedColumnUDFSpec> getUdfSpecList()
+    {
+        return udfSpecList;
     }
 }
