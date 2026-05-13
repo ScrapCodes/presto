@@ -348,7 +348,16 @@ public class IcebergTableProperties
     @SuppressWarnings("unchecked")
     public DerivedColumnUDFSpecList getDerivedColumnUDFSpec(Map<String, Object> tableProperties)
     {
-        return (DerivedColumnUDFSpecList) tableProperties.get(DERIVED_COLUMN_UDF_SPEC);
+        DerivedColumnUDFSpecList derivedColumnUDFSpecList = (DerivedColumnUDFSpecList) tableProperties.get(DERIVED_COLUMN_UDF_SPEC);
+        if (derivedColumnUDFSpecList == null) {
+            derivedColumnUDFSpecList = new DerivedColumnUDFSpecList(ImmutableList.of());
+        }
+        else {
+            if (derivedColumnUDFSpecList.getUdfSpecList() == null) {
+                derivedColumnUDFSpecList = new DerivedColumnUDFSpecList(ImmutableList.of());
+            }
+        }
+        return derivedColumnUDFSpecList;
     }
 
     @SuppressWarnings("unchecked")

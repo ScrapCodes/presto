@@ -31,6 +31,7 @@ import com.facebook.presto.sql.relational.RowExpressionDeterminismEvaluator;
 import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
 import com.facebook.presto.sql.relational.RowExpressionOptimizer;
 import com.facebook.presto.testing.QueryRunner;
+import com.facebook.presto.testing.QueryRunner.MaterializedResultWithPlan;
 import com.facebook.presto.tests.AbstractTestQueryFramework;
 import com.google.common.collect.ImmutableMap;
 import org.assertj.core.util.Files;
@@ -148,12 +149,14 @@ public class TestIcebergDerivedColumnOptimizer
                 .setCatalogType(REST)
                 .setExtraConnectorProperties(ImmutableMap.<String, String>builder()
                         .putAll(restConnectorProperties(restServer.getBaseUrl().toString()))
+                        .put("iceberg.derived_columns.enable", "true")
                         .build())
                 .setDataDirectory(Optional.of(warehouseLocation.toPath()))
                 .setSchemaName("test_schema")
                 .setCreateTpchTables(false)
                 .setAddJmxPlugin(false)
-                .build().getQueryRunner();
+                .build()
+                .getQueryRunner();
     }
 
     @Test
@@ -186,7 +189,7 @@ public class TestIcebergDerivedColumnOptimizer
             assertQuery(query, "VALUES 121");
             assertQuery("SELECT c1 FROM test_table1 WHERE lower(c2) = 'a' AND c1 = 121", "VALUES 121");
             // TODO: Pattern based plan matchers failed to work.
-            QueryRunner.MaterializedResultWithPlan resultWithPlan = getQueryRunner().executeWithPlan(getSession(), query, WarningCollector.NOOP);
+            MaterializedResultWithPlan resultWithPlan = getQueryRunner().executeWithPlan(getSession(), query, WarningCollector.NOOP);
             FilterNode filter = PlanNodeSearcher.searchFrom(resultWithPlan.getQueryPlan().getRoot()).where(planNode -> planNode instanceof FilterNode).findOnlyElement();
             String formattedRowExpression = ROW_EXPRESSION_SERVICE.formatRowExpression(getSession().toConnectorSession(), filter.getPredicate());
             assertEquals(formattedRowExpression, "(c2_derived) = (VARCHAR'a')");
@@ -255,7 +258,7 @@ public class TestIcebergDerivedColumnOptimizer
             @Language("SQL") String query = "SELECT c1, c2 FROM test_table2 WHERE c1 = 100 OR (lower(c2) = 'a' AND lpad(c2, 10, 'X') = 'XXXXXXXXXA' ) OR c2 LIKE '%Z%'";
             assertQuery(query, "VALUES (121, 'A')");
             assertQuery("SELECT c1 FROM test_table2 WHERE lower(c2) = 'a' AND c1 = 121", "VALUES 121");
-            QueryRunner.MaterializedResultWithPlan resultWithPlan = getQueryRunner().executeWithPlan(getSession(), query, WarningCollector.NOOP);
+            MaterializedResultWithPlan resultWithPlan = getQueryRunner().executeWithPlan(getSession(), query, WarningCollector.NOOP);
             FilterNode filter = PlanNodeSearcher.searchFrom(resultWithPlan.getQueryPlan().getRoot()).where(planNode -> planNode instanceof FilterNode).findOnlyElement();
             String formattedRowExpression = ROW_EXPRESSION_SERVICE.formatRowExpression(getSession().toConnectorSession(), filter.getPredicate());
             assertEquals(formattedRowExpression, "((((c1) = (BIGINT'100')) OR ((STRPOS(c2, VARCHAR'Z')) <> (BIGINT'0'))) OR ((c2_derived) = (VARCHAR'a'))) AND " +

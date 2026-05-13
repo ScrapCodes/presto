@@ -78,6 +78,7 @@ public class IcebergConfig
     private DataSize maxStatisticsFileCacheSize = succinctDataSize(256, MEGABYTE);
     private String materializedViewStoragePrefix = "__mv_storage__";
     private int materializedViewMaxChangedPartitions = 100;
+    private boolean derivedColumnEnabled;
 
     @NotNull
     public FileFormat getFileFormat()
@@ -90,6 +91,18 @@ public class IcebergConfig
     {
         this.fileFormat = fileFormat;
         return this;
+    }
+
+    @Config("iceberg.derived_columns.enable")
+    public IcebergConfig setDerivedColumnsEnabled(boolean derivedColumnEnabled)
+    {
+        this.derivedColumnEnabled = derivedColumnEnabled;
+        return this;
+    }
+
+    public boolean isDerivedColumnsEnabled()
+    {
+        return this.derivedColumnEnabled;
     }
 
     @NotNull

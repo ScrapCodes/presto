@@ -75,6 +75,7 @@ public class TestIcebergConfig
                 .setMaxStatisticsFileCacheSize(succinctDataSize(256, MEGABYTE))
                 .setStatisticsKllSketchKParameter(1024)
                 .setMaterializedViewStoragePrefix("__mv_storage__")
+                .setDerivedColumnsEnabled(false)
                 .setMaterializedViewMaxChangedPartitions(100));
     }
 
@@ -113,6 +114,7 @@ public class TestIcebergConfig
                 .put("iceberg.statistics-kll-sketch-k-parameter", "4096")
                 .put("iceberg.materialized-view-storage-prefix", "custom_mv_prefix")
                 .put("iceberg.materialized-view-max-changed-partitions", "2000")
+                .put("iceberg.derived_columns.enable", "true")
                 .build();
 
         IcebergConfig expected = new IcebergConfig()
@@ -146,7 +148,8 @@ public class TestIcebergConfig
                 .setMaxStatisticsFileCacheSize(succinctDataSize(512, MEGABYTE))
                 .setStatisticsKllSketchKParameter(4096)
                 .setMaterializedViewStoragePrefix("custom_mv_prefix")
-                .setMaterializedViewMaxChangedPartitions(2000);
+                .setMaterializedViewMaxChangedPartitions(2000)
+                .setDerivedColumnsEnabled(true);
 
         assertFullMapping(properties, expected);
     }

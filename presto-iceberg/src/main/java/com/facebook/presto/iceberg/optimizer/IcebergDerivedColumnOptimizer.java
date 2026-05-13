@@ -68,6 +68,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.common.type.TypeSignature.parseTypeSignature;
+import static com.facebook.presto.iceberg.IcebergSessionProperties.isDerivedColumnsEnabled;
 import static com.facebook.presto.iceberg.IcebergTableType.DATA;
 import static com.facebook.presto.spi.ConnectorPlanRewriter.rewriteWith;
 import static com.google.common.base.Preconditions.checkState;
@@ -139,6 +140,10 @@ public class IcebergDerivedColumnOptimizer
         @Override
         public PlanNode visitFilter(FilterNode filter, ConnectorPlanRewriter.RewriteContext<Void> context)
         {
+            if (!isDerivedColumnsEnabled(session)) {
+                return filter;
+            }
+
             if (!(filter.getSource() instanceof TableScanNode)) {
                 return visitPlan(filter, context);
             }
@@ -193,7 +198,7 @@ public class IcebergDerivedColumnOptimizer
             Set<VariableReferenceExpression> outputVariables = new HashSet<>(tableScan.getOutputVariables());
             Map<VariableReferenceExpression, ColumnHandle> tableAssignments = new HashMap<>(tableScan.getAssignments());
             TableHandle handle = tableScan.getTable();
-            RewrittenRowExp rewrittenCallExp = filterPredicate.accept(new DerivedColumnRewriteCallExpression(typeManager), new RewriteContext(derivedColumnUDFSpecMap, columnsMap));
+            RewrittenRowExp rewrittenCallExp = filterPredicate.accept(new DerivedColumnRewriteCallExpression(), new RewriteContext(derivedColumnUDFSpecMap, columnsMap));
             filterPredicateRewritten = rewrittenCallExp.rewrittenPredicate;
             Function<VariableReferenceExpression, IcebergColumnHandle> derivedColumnHandle = varRef -> new IcebergColumnHandle(
                     new ColumnIdentity(columnIndexMap.get(varRef.getName()), varRef.getName(), ColumnIdentity.TypeCategory.PRIMITIVE, List.of()),
@@ -239,13 +244,6 @@ public class IcebergDerivedColumnOptimizer
         private static class DerivedColumnRewriteCallExpression
                 implements RowExpressionVisitor<RewrittenRowExp, RewriteContext>
         {
-            private final TypeManager typeManager;
-
-            public DerivedColumnRewriteCallExpression(TypeManager typeManager)
-            {
-                this.typeManager = typeManager;
-            }
-
             @Override
             public RewrittenRowExp visitExpression(RowExpression expression, RewriteContext context)
             {
@@ -271,8 +269,9 @@ public class IcebergDerivedColumnOptimizer
                 List<RowExpression> argumentsRowExpression = arguments.stream().map(arg -> arg.rewrittenPredicate).toList();
                 FunctionHandle functionHandleArg = filterPredicate.getFunctionHandle();
                 Multimap<FunctionHandle, DerivedColumnUDFSpec> derivedColumnUDFSpecMap = rewriteContext.derivedColumnUDFSpecMap;
-                if (derivedColumnUDFSpecMap.containsKey(functionHandleArg.canonicalize())) { // Possible match !
-                    Collection<DerivedColumnUDFSpec> derivedColumnUDFSpecs = derivedColumnUDFSpecMap.get(functionHandleArg.canonicalize());
+                FunctionHandle functionHandle = functionHandleArg.canonicalize();
+                if (derivedColumnUDFSpecMap.containsKey(functionHandle)) { // Possible match !
+                    Collection<DerivedColumnUDFSpec> derivedColumnUDFSpecs = derivedColumnUDFSpecMap.get(functionHandle);
                     List<DerivedColumnArgumentSpec> argumentSpecList = getDerivedColumnArgumentSpecs(argumentsRowExpression);
                     // Next we search for a derived column spec, which exactly matches (including arguments') the call expression (i.e. UDF)
                     Set<DerivedColumnUDFSpec> matchingUDFSpec =
