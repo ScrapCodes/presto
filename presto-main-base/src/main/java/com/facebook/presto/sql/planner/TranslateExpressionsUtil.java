@@ -29,6 +29,7 @@ import com.facebook.presto.sql.analyzer.RelationId;
 import com.facebook.presto.sql.analyzer.RelationType;
 import com.facebook.presto.sql.analyzer.Scope;
 import com.facebook.presto.sql.parser.SqlParser;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.SqlToRowExpressionTranslator;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.LambdaArgumentDeclaration;
@@ -74,7 +75,14 @@ public class TranslateExpressionsUtil
 
     public static RowExpression toRowExpression(Expression expression, Metadata metadata, Session session, Map<NodeRef<Expression>, Type> types, SqlToRowExpressionTranslator.Context context)
     {
-        return SqlToRowExpressionTranslator.translate(expression, types, ImmutableMap.of(), metadata.getFunctionAndTypeManager(), session, context);
+        return SqlToRowExpressionTranslator.translate(
+                expression,
+                types,
+                ImmutableMap.of(),
+                metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                session.toConnectorSession(),
+                context);
     }
 
     public static Map<NodeRef<Expression>, Type> analyzeCallExpressionTypes(

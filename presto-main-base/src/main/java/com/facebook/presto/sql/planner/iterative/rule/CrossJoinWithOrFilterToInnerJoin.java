@@ -186,7 +186,7 @@ public class CrossJoinWithOrFilterToInnerJoin
         for (int i = 0; i < variablesInOrCondition.size(); ++i) {
             constantsArgument.add(constant((long) i + 1, INTEGER));
         }
-        CallExpression arrayConstruct = call(functionAndTypeManager, "array_constructor", new ArrayType(INTEGER), constantsArgument.build());
+        CallExpression arrayConstruct = call(functionAndTypeManager.getFunctionAndTypeResolver(), "array_constructor", new ArrayType(INTEGER), constantsArgument.build());
 
         VariableReferenceExpression arrayVariable = variableAllocator.newVariable(arrayConstruct);
         ImmutableMap.Builder<VariableReferenceExpression, RowExpression> projectAssignment = ImmutableMap.builder();
@@ -287,7 +287,7 @@ public class CrossJoinWithOrFilterToInnerJoin
         for (int i = 0; i < equalExpressionList.size(); ++i) {
             ImmutableList.Builder<RowExpression> matchCondition = ImmutableList.builder();
             for (int j = 0; j < i; ++j) {
-                matchCondition.add(not(functionAndTypeManager, coalesceNullToFalse(equalExpressionList.get(j))));
+                matchCondition.add(not(functionAndTypeManager.getFunctionAndTypeResolver(), coalesceNullToFalse(equalExpressionList.get(j))));
             }
             matchCondition.add(equalExpressionList.get(i));
             whenExpression.add(new SpecialFormExpression(WHEN, BOOLEAN, constant((long) i + 1, INTEGER), and(matchCondition.build())));

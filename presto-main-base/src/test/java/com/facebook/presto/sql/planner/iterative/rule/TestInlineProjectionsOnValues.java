@@ -43,7 +43,7 @@ public class TestInlineProjectionsOnValues
         tester().assertThat(new InlineProjectionsOnValues(tester.getMetadata().getFunctionAndTypeManager()))
                 .setSystemProperty(INLINE_PROJECTIONS_ON_VALUES, "true")
                 .on(p -> p.project(p.values(p.getIdAllocator().getNextId(), p.variable("a")),
-                        assignment(p.variable("b"), call(tester.getMetadata().getFunctionAndTypeManager(), "random", BIGINT, p.variable("a")))))
+                        assignment(p.variable("b"), call(tester.getMetadata().getFunctionAndTypeManager().getFunctionAndTypeResolver(), "random", BIGINT, p.variable("a")))))
                 .doesNotFire();
     }
 

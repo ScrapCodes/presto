@@ -76,6 +76,13 @@
         </dependency>
 
         <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-optimizer-common</artifactId>
+            <version>0.298-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>com.facebook.airlift</groupId>
             <artifactId>log</artifactId>
             <scope>test</scope>

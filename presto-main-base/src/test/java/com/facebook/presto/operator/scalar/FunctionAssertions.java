@@ -75,6 +75,7 @@ import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.ExpressionInterpreter;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.TypeProvider;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.tree.Cast;
 import com.facebook.presto.sql.tree.DefaultTraversalVisitor;
 import com.facebook.presto.sql.tree.DereferenceExpression;
@@ -256,6 +257,7 @@ public final class FunctionAssertions
         metadata = runner.getMetadata();
         compiler = runner.getExpressionCompiler();
     }
+
     public FunctionAndTypeManager getFunctionAndTypeManager()
     {
         return runner.getFunctionAndTypeManager();
@@ -1060,7 +1062,8 @@ public final class FunctionAssertions
 
     private RowExpression toRowExpression(Expression projection, Map<NodeRef<Expression>, Type> expressionTypes, Map<VariableReferenceExpression, Integer> layout)
     {
-        return translate(projection, expressionTypes, layout, metadata.getFunctionAndTypeManager(), session);
+        return translate(projection, expressionTypes, layout, metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()), session.toConnectorSession());
     }
 
     private static Page getAtMostOnePage(Operator operator, Page sourcePage)

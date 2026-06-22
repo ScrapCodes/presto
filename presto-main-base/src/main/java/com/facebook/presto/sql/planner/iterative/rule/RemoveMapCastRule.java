@@ -128,19 +128,19 @@ public class RemoveMapCastRule
 
                 if (canRemoveMapCast(fromKeyType, fromValueType, toKeyType, toValueType, node.getArguments().get(1).getType())) {
                     if (functionResolution.isSubscriptFunction(node.getFunctionHandle())) {
-                        RowExpression newIndex = castToInteger(functionAndTypeManager, node.getArguments().get(1));
+                        RowExpression newIndex = castToInteger(functionAndTypeManager.getFunctionAndTypeResolver(), node.getArguments().get(1));
                         return call(SUBSCRIPT.name(), functionResolution.subscriptFunction(castInput.getType(), newIndex.getType()), node.getType(), castInput, newIndex);
                     }
                     else if (functionResolution.isElementAtFunction(node.getFunctionHandle())) {
-                        RowExpression newIndex = tryCast(functionAndTypeManager, node.getArguments().get(1), INTEGER);
-                        return call(functionAndTypeManager, "element_at", node.getType(), castInput, newIndex);
+                        RowExpression newIndex = tryCast(functionAndTypeManager.getFunctionAndTypeResolver(), node.getArguments().get(1), INTEGER);
+                        return call(functionAndTypeManager.getFunctionAndTypeResolver(), "element_at", node.getType(), castInput, newIndex);
                     }
                     else if (functionResolution.isMapSubSetFunction(node.getFunctionHandle())) {
                         RowExpression newKeyArray = null;
                         if (node.getArguments().get(1) instanceof CallExpression && functionResolution.isArrayConstructor(((CallExpression) node.getArguments().get(1)).getFunctionHandle())) {
                             CallExpression arrayConstruct = (CallExpression) node.getArguments().get(1);
-                            List<RowExpression> newArguments = arrayConstruct.getArguments().stream().map(x -> tryCast(functionAndTypeManager, x, INTEGER)).collect(toImmutableList());
-                            newKeyArray = call(functionAndTypeManager, "array_constructor", new ArrayType(INTEGER), newArguments);
+                            List<RowExpression> newArguments = arrayConstruct.getArguments().stream().map(x -> tryCast(functionAndTypeManager.getFunctionAndTypeResolver(), x, INTEGER)).collect(toImmutableList());
+                            newKeyArray = call(functionAndTypeManager.getFunctionAndTypeResolver(), "array_constructor", new ArrayType(INTEGER), newArguments);
                         }
                         else if (node.getArguments().get(1) instanceof ConstantExpression) {
                             ConstantExpression constantArray = (ConstantExpression) node.getArguments().get(1);
@@ -150,12 +150,12 @@ public class RemoveMapCastRule
                             ImmutableList.Builder<RowExpression> arguments = ImmutableList.builder();
                             for (int i = 0; i < arrayValue.getPositionCount(); ++i) {
                                 ConstantExpression mapKey = constant(readNativeValue(arrayElementType, arrayValue, i), arrayElementType);
-                                arguments.add(tryCast(functionAndTypeManager, mapKey, INTEGER));
+                                arguments.add(tryCast(functionAndTypeManager.getFunctionAndTypeResolver(), mapKey, INTEGER));
                             }
-                            newKeyArray = call(functionAndTypeManager, "array_constructor", new ArrayType(INTEGER), arguments.build());
+                            newKeyArray = call(functionAndTypeManager.getFunctionAndTypeResolver(), "array_constructor", new ArrayType(INTEGER), arguments.build());
                         }
                         if (newKeyArray != null) {
-                            CallExpression mapSubset = call(functionAndTypeManager, "map_subset", castInput.getType(), castInput, newKeyArray);
+                            CallExpression mapSubset = call(functionAndTypeManager.getFunctionAndTypeResolver(), "map_subset", castInput.getType(), castInput, newKeyArray);
                             return call("CAST", functionAndTypeManager.lookupCast(CastType.CAST, mapSubset.getType(), node.getType()), node.getType(), mapSubset);
                         }
                     }

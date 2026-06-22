@@ -104,7 +104,8 @@ public final class SqlFunctionUtils
                                 argumentVariables.values().stream()
                                         .collect(toImmutableMap(VariableReferenceExpression::getName, VariableReferenceExpression::getType))).getExpressionTypes(),
                         ImmutableMap.of(),
-                        functionAndTypeManager,
+                        functionAndTypeManager.getFunctionAndTypeResolver(),
+                        new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver()),
                         Optional.empty(),
                         Optional.empty(),
                         sqlFunctionProperties,
@@ -151,7 +152,8 @@ public final class SqlFunctionUtils
                                         VariableReferenceExpression::getType)))
                         .getExpressionTypes(),
                 ImmutableMap.of(),
-                functionAndTypeManager,
+                functionAndTypeManager.getFunctionAndTypeResolver(),
+                new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver()),
                 Optional.empty(),
                 Optional.empty(),
                 session.getSqlFunctionProperties(),

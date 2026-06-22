@@ -235,7 +235,8 @@ public class TestPinotQueryBase
                 expression,
                 ImmutableMap.of(),
                 WarningCollector.NOOP);
-        return SqlToRowExpressionTranslator.translate(expression, expressionTypes, ImmutableMap.of(), functionAndTypeManager, session);
+        return SqlToRowExpressionTranslator.translate(expression, expressionTypes, ImmutableMap.of(), functionAndTypeManager.getFunctionAndTypeResolver(),
+                new FunctionResolution(functionAndTypeManager.getFunctionAndTypeResolver()), session.toConnectorSession());
     }
 
     protected LimitNode limit(PlanBuilder pb, long count, PlanNode source)

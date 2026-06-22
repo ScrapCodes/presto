@@ -18,7 +18,6 @@ import com.facebook.presto.client.IntervalYearMonth;
 import com.facebook.presto.common.type.TimeZoneKey;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.sql.tree.IntervalLiteral.IntervalField;
-import jakarta.annotation.Nullable;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.DurationFieldType;
@@ -49,11 +48,6 @@ import java.util.stream.Stream;
 
 import static com.facebook.presto.common.type.DateTimeEncoding.unpackMillisUtc;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
-import static com.facebook.presto.util.DateTimeZoneIndex.getChronology;
-import static com.facebook.presto.util.DateTimeZoneIndex.getDateTimeZone;
-import static com.facebook.presto.util.DateTimeZoneIndex.packDateTimeWithZone;
-import static com.facebook.presto.util.DateTimeZoneIndex.unpackChronology;
-import static com.facebook.presto.util.DateTimeZoneIndex.unpackDateTimeZone;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
 
@@ -154,7 +148,7 @@ public final class DateTimeUtils
         }
     }
 
-    public static long toTimeStampInMillis(@Nullable DateTime dateTime)
+    public static long toTimeStampInMillis(DateTime dateTime)
     {
         if (dateTime == null) {
             return 0L;
@@ -175,7 +169,7 @@ public final class DateTimeUtils
     {
         try {
             DateTime dateTime = TIMESTAMP_WITH_TIME_ZONE_FORMATTER.parseDateTime(value);
-            return packDateTimeWithZone(dateTime);
+            return DateTimeZoneIndex.packDateTimeWithZone(dateTime);
         }
         catch (Exception e) {
             return TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.parseMillis(value);
@@ -193,10 +187,10 @@ public final class DateTimeUtils
     {
         try {
             DateTime dateTime = TIMESTAMP_WITH_TIME_ZONE_FORMATTER.parseDateTime(value);
-            return packDateTimeWithZone(dateTime);
+            return DateTimeZoneIndex.packDateTimeWithZone(dateTime);
         }
         catch (RuntimeException e) {
-            return LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.withChronology(getChronology(timeZoneKey)).parseMillis(value);
+            return LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.withChronology(DateTimeZoneIndex.getChronology(timeZoneKey)).parseMillis(value);
         }
     }
 
@@ -212,8 +206,8 @@ public final class DateTimeUtils
      */
     public static long parseTimestampWithTimeZone(TimeZoneKey timeZoneKey, String timestampWithTimeZone)
     {
-        DateTime dateTime = TIMESTAMP_WITH_OR_WITHOUT_TIME_ZONE_FORMATTER.withChronology(getChronology(timeZoneKey)).withOffsetParsed().parseDateTime(timestampWithTimeZone);
-        return packDateTimeWithZone(dateTime);
+        DateTime dateTime = TIMESTAMP_WITH_OR_WITHOUT_TIME_ZONE_FORMATTER.withChronology(DateTimeZoneIndex.getChronology(timeZoneKey)).withOffsetParsed().parseDateTime(timestampWithTimeZone);
+        return DateTimeZoneIndex.packDateTimeWithZone(dateTime);
     }
 
     /**
@@ -245,12 +239,12 @@ public final class DateTimeUtils
     @Deprecated
     public static long parseTimestampWithoutTimeZone(TimeZoneKey timeZoneKey, String value)
     {
-        return TIMESTAMP_WITH_OR_WITHOUT_TIME_ZONE_FORMATTER.withChronology(getChronology(timeZoneKey)).parseMillis(value);
+        return TIMESTAMP_WITH_OR_WITHOUT_TIME_ZONE_FORMATTER.withChronology(DateTimeZoneIndex.getChronology(timeZoneKey)).parseMillis(value);
     }
 
     public static String printTimestampWithTimeZone(long timestampWithTimeZone)
     {
-        ISOChronology chronology = unpackChronology(timestampWithTimeZone);
+        ISOChronology chronology = DateTimeZoneIndex.unpackChronology(timestampWithTimeZone);
         long millis = unpackMillisUtc(timestampWithTimeZone);
         return TIMESTAMP_WITH_TIME_ZONE_FORMATTER.withChronology(chronology).print(millis);
     }
@@ -263,7 +257,7 @@ public final class DateTimeUtils
     @Deprecated
     public static String printTimestampWithoutTimeZone(TimeZoneKey timeZoneKey, long timestamp)
     {
-        return LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.withChronology(getChronology(timeZoneKey)).print(timestamp);
+        return LEGACY_TIMESTAMP_WITHOUT_TIME_ZONE_FORMATTER.withChronology(DateTimeZoneIndex.getChronology(timeZoneKey)).print(timestamp);
     }
 
     public static boolean timestampHasTimeZone(String value)
@@ -359,7 +353,7 @@ public final class DateTimeUtils
     public static long parseTimeWithTimeZone(String timeWithTimeZone)
     {
         DateTime dateTime = TIME_WITH_TIME_ZONE_FORMATTER.parseDateTime(timeWithTimeZone);
-        return packDateTimeWithZone(dateTime);
+        return DateTimeZoneIndex.packDateTimeWithZone(dateTime);
     }
 
     /**
@@ -383,12 +377,12 @@ public final class DateTimeUtils
     @Deprecated
     public static long parseTimeWithoutTimeZone(TimeZoneKey timeZoneKey, String value)
     {
-        return TIME_FORMATTER.withZone(getDateTimeZone(timeZoneKey)).parseMillis(value);
+        return TIME_FORMATTER.withZone(DateTimeZoneIndex.getDateTimeZone(timeZoneKey)).parseMillis(value);
     }
 
     public static String printTimeWithTimeZone(long timeWithTimeZone)
     {
-        DateTimeZone timeZone = unpackDateTimeZone(timeWithTimeZone);
+        DateTimeZone timeZone = DateTimeZoneIndex.unpackDateTimeZone(timeWithTimeZone);
         long millis = unpackMillisUtc(timeWithTimeZone);
         return TIME_WITH_TIME_ZONE_FORMATTER.withZone(timeZone).print(millis);
     }
@@ -401,7 +395,7 @@ public final class DateTimeUtils
     @Deprecated
     public static String printTimeWithoutTimeZone(TimeZoneKey timeZoneKey, long value)
     {
-        return TIME_FORMATTER.withZone(getDateTimeZone(timeZoneKey)).print(value);
+        return TIME_FORMATTER.withZone(DateTimeZoneIndex.getDateTimeZone(timeZoneKey)).print(value);
     }
 
     public static boolean timeHasTimeZone(String value)

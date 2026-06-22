@@ -381,7 +381,7 @@ public class MetadataQueryOptimizer
                 for (List<RowExpression> partitionedArguments : Lists.partition(arguments, 100)) {
                     RowExpression expression = expressionOptimizerManager.getExpressionOptimizer(connectorSession).optimize(
                             call(
-                                    metadata.getFunctionAndTypeManager(),
+                                    metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
                                     scalarFunctionName,
                                     returnType,
                                     partitionedArguments),

@@ -1101,8 +1101,9 @@ public class PlanBuilder
                 expression,
                 expressionTypes,
                 ImmutableMap.of(),
-                metadata.getFunctionAndTypeManager(),
-                session);
+                metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                session.toConnectorSession());
     }
 
     public static Expression expression(String sql, ParsingOptions options)

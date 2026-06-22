@@ -125,8 +125,8 @@ public class LeftJoinWithArrayContainsToEquiJoinCondition
             elementVariable = (VariableReferenceExpression) element;
         }
 
-        CallExpression arrayDistinct = call(functionAndTypeManager, "array_distinct", new ArrayType(element.getType()), array);
-        CallExpression arrayFilterNull = call(functionAndTypeManager, "remove_nulls", arrayDistinct.getType(), ImmutableList.of(arrayDistinct));
+        CallExpression arrayDistinct = call(functionAndTypeManager.getFunctionAndTypeResolver(), "array_distinct", new ArrayType(element.getType()), array);
+        CallExpression arrayFilterNull = call(functionAndTypeManager.getFunctionAndTypeResolver(), "remove_nulls", arrayDistinct.getType(), ImmutableList.of(arrayDistinct));
         VariableReferenceExpression arrayFilterNullVariable = context.getVariableAllocator().newVariable(arrayFilterNull);
         PlanNode newRight = PlannerUtils.addProjections(node.getRight(), context.getIdAllocator(), ImmutableMap.of(arrayFilterNullVariable, arrayFilterNull));
         VariableReferenceExpression unnestVariable = context.getVariableAllocator().newVariable("unnest", element.getType());

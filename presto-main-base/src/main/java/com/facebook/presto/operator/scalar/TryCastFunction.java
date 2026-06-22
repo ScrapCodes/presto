@@ -35,6 +35,7 @@ import static com.facebook.presto.metadata.CastType.CAST;
 import static com.facebook.presto.spi.function.Signature.typeVariable;
 import static com.facebook.presto.spi.function.SqlFunctionVisibility.HIDDEN;
 import static com.facebook.presto.sql.gen.BytecodeUtils.getAllScalarFunctionImplementationChoices;
+import static com.facebook.presto.sql.planner.Constants.TRY_CAST_NAME;
 import static java.lang.invoke.MethodHandles.catchException;
 import static java.lang.invoke.MethodHandles.constant;
 import static java.lang.invoke.MethodHandles.dropArguments;
@@ -44,7 +45,6 @@ public class TryCastFunction
         extends SqlScalarFunction
 {
     public static final TryCastFunction TRY_CAST = new TryCastFunction();
-    public static final String TRY_CAST_NAME = "TRY_CAST";
 
     public TryCastFunction()
     {

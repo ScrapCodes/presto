@@ -93,7 +93,7 @@ public final class DecimalOperators
                 .argumentTypes(decimalLeftSignature, decimalRightSignature)
                 .returnType(decimalResultSignature)
                 .build();
-        return SqlScalarFunction.builder(DecimalOperators.class, ADD)
+        return PolymorphicScalarFunctionBuilder.builder(DecimalOperators.class, ADD)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice
@@ -175,16 +175,16 @@ public final class DecimalOperators
                 .argumentTypes(decimalLeftSignature, decimalRightSignature)
                 .returnType(decimalResultSignature)
                 .build();
-        return SqlScalarFunction.builder(DecimalOperators.class, SUBTRACT)
+        return PolymorphicScalarFunctionBuilder.builder(DecimalOperators.class, SUBTRACT)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice
-                    .implementation(methodsGroup -> methodsGroup
-                            .methods("subtractShortShortShort")
-                            .withExtraParameters(DecimalOperators::calculateShortRescaleParameters))
-                    .implementation(methodsGroup -> methodsGroup
-                            .methods("subtractShortShortLong", "subtractLongLongLong", "subtractShortLongLong", "subtractLongShortLong")
-                            .withExtraParameters(DecimalOperators::calculateLongRescaleParameters)))
+                        .implementation(methodsGroup -> methodsGroup
+                                .methods("subtractShortShortShort")
+                                .withExtraParameters(DecimalOperators::calculateShortRescaleParameters))
+                        .implementation(methodsGroup -> methodsGroup
+                                .methods("subtractShortShortLong", "subtractLongLongLong", "subtractShortLongLong", "subtractLongShortLong")
+                                .withExtraParameters(DecimalOperators::calculateLongRescaleParameters)))
                 .build();
     }
 
@@ -253,12 +253,12 @@ public final class DecimalOperators
                 .argumentTypes(decimalLeftSignature, decimalRightSignature)
                 .returnType(decimalResultSignature)
                 .build();
-        return SqlScalarFunction.builder(DecimalOperators.class, MULTIPLY)
+        return PolymorphicScalarFunctionBuilder.builder(DecimalOperators.class, MULTIPLY)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice
-                    .implementation(methodsGroup -> methodsGroup
-                            .methods("multiplyShortShortShort", "multiplyShortShortLong", "multiplyLongLongLong", "multiplyShortLongLong", "multiplyLongShortLong")))
+                        .implementation(methodsGroup -> methodsGroup
+                                .methods("multiplyShortShortShort", "multiplyShortShortLong", "multiplyLongLongLong", "multiplyShortLongLong", "multiplyLongShortLong")))
                 .build();
     }
 
@@ -318,13 +318,13 @@ public final class DecimalOperators
                 .argumentTypes(decimalLeftSignature, decimalRightSignature)
                 .returnType(decimalResultSignature)
                 .build();
-        return SqlScalarFunction.builder(DecimalOperators.class, DIVIDE)
+        return PolymorphicScalarFunctionBuilder.builder(DecimalOperators.class, DIVIDE)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice
-                    .implementation(methodsGroup -> methodsGroup
-                            .methods("divideShortShortShort", "divideShortLongShort", "divideLongShortShort", "divideShortShortLong", "divideLongLongLong", "divideShortLongLong", "divideLongShortLong")
-                            .withExtraParameters(DecimalOperators::divideRescaleFactor)))
+                        .implementation(methodsGroup -> methodsGroup
+                                .methods("divideShortShortShort", "divideShortLongShort", "divideLongShortShort", "divideShortShortLong", "divideLongLongLong", "divideShortLongLong", "divideLongShortLong")
+                                .withExtraParameters(DecimalOperators::divideRescaleFactor)))
                 .build();
     }
 
@@ -459,13 +459,13 @@ public final class DecimalOperators
 
     public static SqlScalarFunction modulusScalarFunction(Signature signature)
     {
-        return SqlScalarFunction.builder(DecimalOperators.class, MODULUS)
+        return PolymorphicScalarFunctionBuilder.builder(DecimalOperators.class, MODULUS)
                 .signature(signature)
                 .deterministic(true)
                 .choice(choice -> choice
-                    .implementation(methodsGroup -> methodsGroup
-                            .methods("modulusShortShortShort", "modulusLongLongLong", "modulusShortLongLong", "modulusShortLongShort", "modulusLongShortShort", "modulusLongShortLong")
-                            .withExtraParameters(DecimalOperators::modulusRescaleParameters)))
+                        .implementation(methodsGroup -> methodsGroup
+                                .methods("modulusShortShortShort", "modulusLongLongLong", "modulusShortLongLong", "modulusShortLongShort", "modulusLongShortShort", "modulusLongShortLong")
+                                .withExtraParameters(DecimalOperators::modulusRescaleParameters)))
                 .build();
     }
 

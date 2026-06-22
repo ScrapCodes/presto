@@ -13,10 +13,9 @@
  */
 package com.facebook.presto.sql.relational;
 
+import com.facebook.presto.common.QualifiedObjectName;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.common.type.Type;
-import com.facebook.presto.metadata.CastType;
-import com.facebook.presto.metadata.FunctionAndTypeManager;
 import com.facebook.presto.spi.SourceLocation;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
@@ -32,6 +31,7 @@ import com.facebook.presto.spi.relation.SpecialFormExpression;
 import com.facebook.presto.spi.relation.SpecialFormExpression.Form;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.analyzer.FunctionAndTypeResolver;
+import com.facebook.presto.sql.planner.Constants;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -43,10 +43,10 @@ import java.util.Set;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
 import static com.facebook.presto.common.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.common.type.IntegerType.INTEGER;
-import static com.facebook.presto.operator.scalar.TryCastFunction.TRY_CAST_NAME;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.COALESCE;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.SWITCH;
 import static com.facebook.presto.sql.analyzer.TypeSignatureProvider.fromTypes;
+import static com.facebook.presto.sql.planner.Constants.TRY_CAST_NAME;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Arrays.asList;
@@ -57,6 +57,7 @@ public final class Expressions
             .filter(OperatorType::isComparisonOperator)
             .map(operator -> operator.getFunctionName().toString())
             .collect(toImmutableList());
+    public static final QualifiedObjectName TRY_CAST = QualifiedObjectName.valueOf("presto", "default", Constants.TRY_CAST_NAME);
 
     private Expressions()
     {
@@ -112,9 +113,9 @@ public final class Expressions
         return new SpecialFormExpression(rowExpression.getSourceLocation(), COALESCE, coalesced.getType(), rowExpression, coalesced);
     }
 
-    public static CallExpression not(FunctionAndTypeManager functionAndTypeManager, RowExpression rowExpression)
+    public static CallExpression not(FunctionAndTypeResolver functionAndTypeResolver, RowExpression rowExpression)
     {
-        return call(functionAndTypeManager, "not", BOOLEAN, rowExpression);
+        return call(functionAndTypeResolver, "not", BOOLEAN, rowExpression);
     }
 
     public static CallExpression call(String displayName, FunctionHandle functionHandle, Type returnType, RowExpression... arguments)
@@ -142,14 +143,9 @@ public final class Expressions
         return new CallExpression(sourceLocation, displayName, functionHandle, returnType, arguments);
     }
 
-    public static CallExpression call(FunctionAndTypeManager functionAndTypeManager, String name, Type returnType, RowExpression... arguments)
+    public static CallExpression call(FunctionAndTypeResolver functionAndTypeResolver, String name, Type returnType, List<RowExpression> arguments)
     {
-        return call(functionAndTypeManager, name, returnType, ImmutableList.copyOf(arguments));
-    }
-
-    public static CallExpression call(FunctionAndTypeManager functionAndTypeManager, String name, Type returnType, List<RowExpression> arguments)
-    {
-        FunctionHandle functionHandle = functionAndTypeManager.lookupFunction(name, fromTypes(arguments.stream().map(RowExpression::getType).collect(toImmutableList())));
+        FunctionHandle functionHandle = functionAndTypeResolver.lookupFunction(name, fromTypes(arguments.stream().map(RowExpression::getType).collect(toImmutableList())));
         return call(name, functionHandle, returnType, arguments);
     }
 
@@ -165,25 +161,25 @@ public final class Expressions
         return call(operatorType.name(), functionHandle, returnType, arguments);
     }
 
-    public static RowExpression castToBigInt(FunctionAndTypeManager functionAndTypeManager, RowExpression rowExpression)
+    public static RowExpression castToBigInt(FunctionAndTypeResolver functionAndTypeResolver, RowExpression rowExpression)
     {
         if (rowExpression.getType().equals(BIGINT)) {
             return rowExpression;
         }
-        return call("CAST", functionAndTypeManager.lookupCast(CastType.CAST, rowExpression.getType(), BIGINT), BIGINT, rowExpression);
+        return call("CAST", functionAndTypeResolver.lookupCast(OperatorType.CAST.getFunctionName().toString(), rowExpression.getType(), BIGINT), BIGINT, rowExpression);
     }
 
-    public static RowExpression castToInteger(FunctionAndTypeManager functionAndTypeManager, RowExpression rowExpression)
+    public static RowExpression castToInteger(FunctionAndTypeResolver functionAndTypeResolver, RowExpression rowExpression)
     {
         if (rowExpression.getType().equals(INTEGER)) {
             return rowExpression;
         }
-        return call("CAST", functionAndTypeManager.lookupCast(CastType.CAST, rowExpression.getType(), INTEGER), INTEGER, rowExpression);
+        return call("CAST", functionAndTypeResolver.lookupCast(OperatorType.CAST.getFunctionName().toString(), rowExpression.getType(), INTEGER), INTEGER, rowExpression);
     }
 
-    public static RowExpression tryCast(FunctionAndTypeManager functionAndTypeManager, RowExpression rowExpression, Type castToType)
+    public static RowExpression tryCast(FunctionAndTypeResolver functionAndTypeResolver, RowExpression rowExpression, Type castToType)
     {
-        return call(TRY_CAST_NAME, functionAndTypeManager.lookupCast(CastType.TRY_CAST, rowExpression.getType(), castToType), castToType, rowExpression);
+        return call(TRY_CAST_NAME, functionAndTypeResolver.lookupCast(TRY_CAST.toString(), rowExpression.getType(), castToType), castToType, rowExpression);
     }
 
     public static RowExpression searchedCaseExpression(List<RowExpression> whenClauses, Optional<RowExpression> defaultValue)

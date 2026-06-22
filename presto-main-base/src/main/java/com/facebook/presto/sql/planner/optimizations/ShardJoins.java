@@ -145,7 +145,7 @@ public class ShardJoins
             if (isApplicable(joinNode)) {
                 long numShards = getNumberOfShards();
                 RowExpression randomNumber = call(
-                        functionAndTypeManager,
+                        functionAndTypeManager.getFunctionAndTypeResolver(),
                         "random",
                         BIGINT,
                         constant(numShards, BIGINT));
@@ -199,7 +199,7 @@ public class ShardJoins
             checkState(numShards > 1);
 
             RowExpression sequenceExpression = call(
-                    functionAndTypeManager,
+                    functionAndTypeManager.getFunctionAndTypeResolver(),
                     "sequence",
                     new ArrayType(BIGINT),
                     constant((long) 0, BIGINT),

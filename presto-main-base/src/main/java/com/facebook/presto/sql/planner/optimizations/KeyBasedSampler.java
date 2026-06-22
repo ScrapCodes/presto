@@ -147,7 +147,7 @@ public class KeyBasedSampler
             RowExpression sampledArg;
             try {
                 sampledArg = call(
-                        functionAndTypeManager,
+                        functionAndTypeManager.getFunctionAndTypeResolver(),
                         getKeyBasedSamplingFunction(session),
                         DOUBLE,
                         ImmutableList.of(arg));

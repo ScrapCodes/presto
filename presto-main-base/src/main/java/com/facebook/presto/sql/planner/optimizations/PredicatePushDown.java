@@ -169,7 +169,7 @@ public class PredicatePushDown
             String operator)
     {
         return call(
-                functionAndTypeManager,
+                functionAndTypeManager.getFunctionAndTypeResolver(),
                 DynamicFilters.DynamicFilterPlaceholderFunction.NAME,
                 BooleanType.BOOLEAN,
                 ImmutableList.of(

@@ -312,17 +312,17 @@ public class PrefilterForLimitingAggregation
 
             VariableReferenceExpression mapVariable = crossJoinRhs.getOutputVariables().get(0);
             VariableReferenceExpression lookupVariable = crossJoinLhs.getOutputVariables().get(crossJoinLhs.getOutputVariables().size() - 1);
-            RowExpression cardinality = call(functionAndTypeManager, "CARDINALITY", BIGINT, mapVariable);
+            RowExpression cardinality = call(functionAndTypeManager.getFunctionAndTypeResolver(), "CARDINALITY", BIGINT, mapVariable);
             RowExpression countExpr = constant(count, BIGINT);
 
             FunctionHandle equalsFunctionHandle = metadata.getFunctionAndTypeManager().resolveOperator(EQUAL, fromTypes(BIGINT, BIGINT));
             RowExpression foundAllEntires = call(EQUAL.name(), equalsFunctionHandle, BOOLEAN, cardinality, countExpr);
             RowExpression mapLookup;
             try {
-                mapLookup = call(functionAndTypeManager, "map_key_exists", BOOLEAN, mapVariable, lookupVariable);
+                mapLookup = call(functionAndTypeManager.getFunctionAndTypeResolver(), "map_key_exists", BOOLEAN, mapVariable, lookupVariable);
             }
             catch (Exception e) {
-                mapLookup = call(functionAndTypeManager, "element_at", BOOLEAN, mapVariable, lookupVariable);
+                mapLookup = call(functionAndTypeManager.getFunctionAndTypeResolver(), "element_at", BOOLEAN, mapVariable, lookupVariable);
             }
             RowExpression check = specialForm(IF, BOOLEAN, foundAllEntires, mapLookup, constant(TRUE, BOOLEAN));
 

@@ -271,7 +271,7 @@ public class DifferentialPlanRewriter
         }
 
         RowExpression stalePredicate = or(staleExpressions);
-        RowExpression freshPredicate = not(metadata.getFunctionAndTypeManager(), stalePredicate);
+        RowExpression freshPredicate = not(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(), stalePredicate);
 
         return new FilterNode(dataTablePlan.getSourceLocation(), idAllocator.getNextId(), dataTablePlan, freshPredicate);
     }
@@ -451,7 +451,7 @@ public class DifferentialPlanRewriter
             NodeWithMapping unchangedResult = buildTableScan(node, node.getOutputVariables());
 
             RowExpression stalePredicate = buildStalePredicate(node, stalePredicates, deltaResult.getMapping());
-            RowExpression unchangedPredicate = not(metadata.getFunctionAndTypeManager(),
+            RowExpression unchangedPredicate = not(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
                     buildStalePredicate(node, stalePredicates, unchangedResult.getMapping()));
 
             // Apply stale/non-stale filters

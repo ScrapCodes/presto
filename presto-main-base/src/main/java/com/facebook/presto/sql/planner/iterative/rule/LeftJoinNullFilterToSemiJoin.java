@@ -167,7 +167,7 @@ public class LeftJoinNullFilterToSemiJoin
 
         SemiJoinNode semiJoinNode = new SemiJoinNode(filterNode.getSourceLocation(), context.getIdAllocator().getNextId(), joinNode.getLeft(), semiJoinFilteringSource,
                 leftKey, rightKey, semiJoinOutput, Optional.empty(), Optional.empty(), Optional.empty(), ImmutableMap.of());
-        RowExpression filterExpression = not(functionAndTypeManager, coalesceNullToFalse(semiJoinOutput));
+        RowExpression filterExpression = not(functionAndTypeManager.getFunctionAndTypeResolver(), coalesceNullToFalse(semiJoinOutput));
         FilterNode semiFilterNode = new FilterNode(filterNode.getSourceLocation(), context.getIdAllocator().getNextId(), semiJoinNode, filterExpression);
         Map<VariableReferenceExpression, RowExpression> outputAssignments =
                 filterNode.getOutputVariables().stream().collect(toImmutableMap(identity(), x -> x.equals(rightKey) ? constantNull(rightKey.getType()) : x));

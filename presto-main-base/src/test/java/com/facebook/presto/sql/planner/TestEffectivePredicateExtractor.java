@@ -209,7 +209,7 @@ public class TestEffectivePredicateExtractor
     {
         PlanNode node = filter(baseTableScan,
                 and(
-                        greaterThan(AV, call(metadata.getFunctionAndTypeManager(), "rand", DOUBLE, ImmutableList.of())),
+                        greaterThan(AV, call(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(), "rand", DOUBLE, ImmutableList.of())),
                         lessThan(BV, bigintLiteral(10))));
 
         RowExpression effectivePredicate = effectivePredicateExtractor.extract(node);

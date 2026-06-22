@@ -160,8 +160,8 @@ public class CrossJoinWithArrayNotContainsToAntiJoin
             return Result.empty();
         }
         final Type type = element.getType();
-        CallExpression arrayDistinct = call(functionAndTypeManager, "array_distinct", new ArrayType(type),
-                call(functionAndTypeManager, "remove_nulls", new ArrayType(type), array));
+        CallExpression arrayDistinct = call(functionAndTypeManager.getFunctionAndTypeResolver(), "array_distinct", new ArrayType(type),
+                call(functionAndTypeManager.getFunctionAndTypeResolver(), "remove_nulls", new ArrayType(type), array));
         VariableReferenceExpression arrayDistinctVariable = context.getVariableAllocator().newVariable(arrayDistinct);
         PlanNode project = PlannerUtils.addProjections(inputWithArray, context.getIdAllocator(), ImmutableMap.of(arrayDistinctVariable, arrayDistinct));
         VariableReferenceExpression unnestVariable = context.getVariableAllocator().newVariable("field", type);

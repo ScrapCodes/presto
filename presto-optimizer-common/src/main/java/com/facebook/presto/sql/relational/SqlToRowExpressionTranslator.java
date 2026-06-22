@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.sql.relational;
 
-import com.facebook.presto.Session;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.common.function.SqlFunctionProperties;
 import com.facebook.presto.common.transaction.TransactionId;
@@ -27,11 +26,12 @@ import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeWithName;
 import com.facebook.presto.common.type.UnknownType;
 import com.facebook.presto.common.type.VarcharType;
-import com.facebook.presto.metadata.FunctionAndTypeManager;
+import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.function.SqlFunctionId;
 import com.facebook.presto.spi.function.SqlInvokedFunction;
+import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.relation.ConstantExpression;
 import com.facebook.presto.spi.relation.ExistsExpression;
 import com.facebook.presto.spi.relation.LambdaDefinitionExpression;
@@ -96,6 +96,7 @@ import com.facebook.presto.sql.tree.TimeLiteral;
 import com.facebook.presto.sql.tree.TimestampLiteral;
 import com.facebook.presto.sql.tree.TryExpression;
 import com.facebook.presto.sql.tree.WhenClause;
+import com.facebook.presto.util.DateTimeUtils;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 
@@ -106,12 +107,22 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.regex.Pattern;
 
-import static com.facebook.presto.SystemSessionProperties.isNativeExecutionEnabled;
+import static com.facebook.presto.common.function.OperatorType.ADD;
 import static com.facebook.presto.common.function.OperatorType.BETWEEN;
+import static com.facebook.presto.common.function.OperatorType.CAST;
+import static com.facebook.presto.common.function.OperatorType.DIVIDE;
 import static com.facebook.presto.common.function.OperatorType.EQUAL;
+import static com.facebook.presto.common.function.OperatorType.GREATER_THAN;
+import static com.facebook.presto.common.function.OperatorType.GREATER_THAN_OR_EQUAL;
+import static com.facebook.presto.common.function.OperatorType.IS_DISTINCT_FROM;
+import static com.facebook.presto.common.function.OperatorType.LESS_THAN;
+import static com.facebook.presto.common.function.OperatorType.LESS_THAN_OR_EQUAL;
+import static com.facebook.presto.common.function.OperatorType.MODULUS;
+import static com.facebook.presto.common.function.OperatorType.MULTIPLY;
 import static com.facebook.presto.common.function.OperatorType.NEGATION;
 import static com.facebook.presto.common.function.OperatorType.NOT_EQUAL;
 import static com.facebook.presto.common.function.OperatorType.SUBSCRIPT;
+import static com.facebook.presto.common.function.OperatorType.SUBTRACT;
 import static com.facebook.presto.common.type.BigintType.BIGINT;
 import static com.facebook.presto.common.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.common.type.CharType.createCharType;
@@ -129,8 +140,6 @@ import static com.facebook.presto.common.type.TypeUtils.isEnumType;
 import static com.facebook.presto.common.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.common.type.VarcharType.VARCHAR;
 import static com.facebook.presto.common.type.VarcharType.createVarcharType;
-import static com.facebook.presto.metadata.CastType.CAST;
-import static com.facebook.presto.metadata.CastType.TRY_CAST;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.AND;
 import static com.facebook.presto.spi.relation.SpecialFormExpression.Form.BIND;
@@ -148,20 +157,17 @@ import static com.facebook.presto.sql.analyzer.ExpressionTreeUtils.getSourceLoca
 import static com.facebook.presto.sql.analyzer.ExpressionTreeUtils.resolveEnumLiteral;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.TYPE_MISMATCH;
 import static com.facebook.presto.sql.analyzer.TypeSignatureProvider.fromTypes;
+import static com.facebook.presto.sql.planner.Constants.NATIVE_EXECUTION_ENABLED;
+import static com.facebook.presto.sql.planner.Constants.TRY_CAST_NAME;
 import static com.facebook.presto.sql.relational.Expressions.call;
 import static com.facebook.presto.sql.relational.Expressions.constant;
 import static com.facebook.presto.sql.relational.Expressions.constantNull;
 import static com.facebook.presto.sql.relational.Expressions.field;
-import static com.facebook.presto.sql.relational.Expressions.inSubquery;
-import static com.facebook.presto.sql.relational.Expressions.quantifiedComparison;
 import static com.facebook.presto.sql.relational.Expressions.specialForm;
 import static com.facebook.presto.sql.tree.DereferenceExpression.getQualifiedName;
 import static com.facebook.presto.type.LikePatternType.LIKE_PATTERN;
-import static com.facebook.presto.util.DateTimeUtils.parseDayTimeInterval;
 import static com.facebook.presto.util.DateTimeUtils.parseTimeWithTimeZone;
 import static com.facebook.presto.util.DateTimeUtils.parseTimeWithoutTimeZone;
-import static com.facebook.presto.util.DateTimeUtils.parseTimestampLiteral;
-import static com.facebook.presto.util.DateTimeUtils.parseYearMonthInterval;
 import static com.facebook.presto.util.LegacyRowFieldOrdinalAccessUtil.parseAnonymousRowFieldOrdinalAccess;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -183,14 +189,16 @@ public final class SqlToRowExpressionTranslator
             Expression expression,
             Map<NodeRef<Expression>, Type> types,
             Map<VariableReferenceExpression, Integer> layout,
-            FunctionAndTypeManager functionAndTypeManager,
-            Session session)
+            FunctionAndTypeResolver functionAndTypeResolver,
+            StandardFunctionResolution functionResolution,
+            ConnectorSession session)
     {
         return translate(
                 expression,
                 types,
                 layout,
-                functionAndTypeManager,
+                functionAndTypeResolver,
+                functionResolution,
                 session,
                 new Context());
     }
@@ -199,28 +207,52 @@ public final class SqlToRowExpressionTranslator
             Expression expression,
             Map<NodeRef<Expression>, Type> types,
             Map<VariableReferenceExpression, Integer> layout,
-            FunctionAndTypeManager functionAndTypeManager,
-            Session session,
+            FunctionAndTypeResolver functionAndTypeResolver,
+            StandardFunctionResolution functionResolution,
+            ConnectorSession session,
             Context context)
     {
         return translate(
                 expression,
                 types,
                 layout,
-                functionAndTypeManager,
-                Optional.of(session.getUser()),
-                session.getTransactionId(),
-                session.getSqlFunctionProperties(),
-                session.getSessionFunctions(),
-                context,
-                isNativeExecutionEnabled(session));
+                functionAndTypeResolver,
+                functionResolution,
+                session,
+                Optional.empty(),
+                context);
     }
 
     public static RowExpression translate(
             Expression expression,
             Map<NodeRef<Expression>, Type> types,
             Map<VariableReferenceExpression, Integer> layout,
-            FunctionAndTypeManager functionAndTypeManager,
+            FunctionAndTypeResolver functionAndTypeResolver,
+            StandardFunctionResolution functionResolution,
+            ConnectorSession session,
+            Optional<TransactionId> transactionId,
+            Context context)
+    {
+        return translate(
+                expression,
+                types,
+                layout,
+                functionAndTypeResolver,
+                functionResolution,
+                Optional.ofNullable(session.getUser()),
+                transactionId,
+                session.getSqlFunctionProperties(),
+                session.getSessionFunctions(),
+                context,
+                session.getProperty(NATIVE_EXECUTION_ENABLED, Boolean.class));
+    }
+
+    public static RowExpression translate(
+            Expression expression,
+            Map<NodeRef<Expression>, Type> types,
+            Map<VariableReferenceExpression, Integer> layout,
+            FunctionAndTypeResolver functionAndTypeResolver,
+            StandardFunctionResolution functionResolution,
             Optional<String> user,
             Optional<TransactionId> transactionId,
             SqlFunctionProperties sqlFunctionProperties,
@@ -231,7 +263,8 @@ public final class SqlToRowExpressionTranslator
                 expression,
                 types,
                 layout,
-                functionAndTypeManager,
+                functionAndTypeResolver,
+                functionResolution,
                 user,
                 transactionId,
                 sqlFunctionProperties,
@@ -244,7 +277,8 @@ public final class SqlToRowExpressionTranslator
             Expression expression,
             Map<NodeRef<Expression>, Type> types,
             Map<VariableReferenceExpression, Integer> layout,
-            FunctionAndTypeManager functionAndTypeManager,
+            FunctionAndTypeResolver functionAndTypeResolver,
+            StandardFunctionResolution functionResolution,
             Optional<String> user,
             Optional<TransactionId> transactionId,
             SqlFunctionProperties sqlFunctionProperties,
@@ -255,7 +289,8 @@ public final class SqlToRowExpressionTranslator
         Visitor visitor = new Visitor(
                 types,
                 layout,
-                functionAndTypeManager,
+                functionAndTypeResolver,
+                functionResolution,
                 user,
                 transactionId,
                 sqlFunctionProperties,
@@ -295,19 +330,19 @@ public final class SqlToRowExpressionTranslator
     {
         private final Map<NodeRef<Expression>, Type> types;
         private final Map<VariableReferenceExpression, Integer> layout;
-        private final FunctionAndTypeManager functionAndTypeManager;
         private final FunctionAndTypeResolver functionAndTypeResolver;
         private final Optional<String> user;
         private final Optional<TransactionId> transactionId;
         private final SqlFunctionProperties sqlFunctionProperties;
         private final Map<SqlFunctionId, SqlInvokedFunction> sessionFunctions;
-        private final FunctionResolution functionResolution;
+        private final StandardFunctionResolution functionResolution;
         private final boolean nativeExecutionEnabled;
 
         private Visitor(
                 Map<NodeRef<Expression>, Type> types,
                 Map<VariableReferenceExpression, Integer> layout,
-                FunctionAndTypeManager functionAndTypeManager,
+                FunctionAndTypeResolver functionAndTypeResolver,
+                StandardFunctionResolution functionResolution,
                 Optional<String> user,
                 Optional<TransactionId> transactionId,
                 SqlFunctionProperties sqlFunctionProperties,
@@ -316,12 +351,11 @@ public final class SqlToRowExpressionTranslator
         {
             this.types = requireNonNull(types, "types is null");
             this.layout = requireNonNull(layout);
-            this.functionAndTypeManager = requireNonNull(functionAndTypeManager);
-            this.functionAndTypeResolver = functionAndTypeManager.getFunctionAndTypeResolver();
+            this.functionAndTypeResolver = functionAndTypeResolver;
             this.user = requireNonNull(user);
             this.transactionId = requireNonNull(transactionId);
             this.sqlFunctionProperties = requireNonNull(sqlFunctionProperties);
-            this.functionResolution = new FunctionResolution(functionAndTypeResolver);
+            this.functionResolution = functionResolution;
             this.sessionFunctions = requireNonNull(sessionFunctions);
             this.nativeExecutionEnabled = nativeExecutionEnabled;
         }
@@ -390,7 +424,7 @@ public final class SqlToRowExpressionTranslator
         @Override
         protected RowExpression visitDoubleLiteral(DoubleLiteral node, Context context)
         {
-            return constant(node.getValue(), functionAndTypeManager.getType(DOUBLE.getTypeSignature()));
+            return constant(node.getValue(), functionAndTypeResolver.getType(DOUBLE.getTypeSignature()));
         }
 
         @Override
@@ -502,10 +536,10 @@ public final class SqlToRowExpressionTranslator
         {
             long value;
             if (sqlFunctionProperties.isLegacyTimestamp()) {
-                value = parseTimestampLiteral(sqlFunctionProperties.getTimeZoneKey(), node.getValue());
+                value = DateTimeUtils.parseTimestampLiteral(sqlFunctionProperties.getTimeZoneKey(), node.getValue());
             }
             else {
-                value = parseTimestampLiteral(node.getValue());
+                value = DateTimeUtils.parseTimestampLiteral(node.getValue());
             }
             return constant(value, getType(node));
         }
@@ -515,10 +549,10 @@ public final class SqlToRowExpressionTranslator
         {
             long value;
             if (node.isYearToMonth()) {
-                value = node.getSign().multiplier() * parseYearMonthInterval(node.getValue(), node.getStartField(), node.getEndField());
+                value = node.getSign().multiplier() * DateTimeUtils.parseYearMonthInterval(node.getValue(), node.getStartField(), node.getEndField());
             }
             else {
-                value = node.getSign().multiplier() * parseDayTimeInterval(node.getValue(), node.getStartField(), node.getEndField());
+                value = node.getSign().multiplier() * DateTimeUtils.parseDayTimeInterval(node.getValue(), node.getStartField(), node.getEndField());
             }
             return constant(value, getType(node));
         }
@@ -528,11 +562,37 @@ public final class SqlToRowExpressionTranslator
         {
             RowExpression left = process(node.getLeft(), context);
             RowExpression right = process(node.getRight(), context);
+            OperatorType operatorType;
+            switch (node.getOperator()) {
+                case EQUAL:
+                    operatorType = EQUAL;
+                    break;
+                case NOT_EQUAL:
+                    operatorType = NOT_EQUAL;
+                    break;
+                case LESS_THAN:
+                    operatorType = LESS_THAN;
+                    break;
+                case LESS_THAN_OR_EQUAL:
+                    operatorType = LESS_THAN_OR_EQUAL;
+                    break;
+                case GREATER_THAN:
+                    operatorType = GREATER_THAN;
+                    break;
+                case GREATER_THAN_OR_EQUAL:
+                    operatorType = GREATER_THAN_OR_EQUAL;
+                    break;
+                case IS_DISTINCT_FROM:
+                    operatorType = IS_DISTINCT_FROM;
+                    break;
+                default:
+                    throw new IllegalStateException("Unsupported comparison operator type: " + node.getOperator());
+            }
 
             return call(
                     getSourceLocation(node),
                     node.getOperator().name(),
-                    functionResolution.comparisonFunction(node.getOperator(), left.getType(), right.getType()),
+                    functionResolution.comparisonFunction(operatorType, left.getType(), right.getType()),
                     BOOLEAN,
                     left,
                     right);
@@ -610,11 +670,30 @@ public final class SqlToRowExpressionTranslator
         {
             RowExpression left = process(node.getLeft(), context);
             RowExpression right = process(node.getRight(), context);
-
+            OperatorType operatorType;
+            switch (node.getOperator()) {
+                case ADD:
+                    operatorType = ADD;
+                    break;
+                case SUBTRACT:
+                    operatorType = SUBTRACT;
+                    break;
+                case MULTIPLY:
+                    operatorType = MULTIPLY;
+                    break;
+                case DIVIDE:
+                    operatorType = DIVIDE;
+                    break;
+                case MODULUS:
+                    operatorType = MODULUS;
+                    break;
+                default:
+                    throw new IllegalStateException("Unknown arithmetic operator: " + node.getOperator());
+            }
             return call(
                     getSourceLocation(node),
                     node.getOperator().name(),
-                    functionResolution.arithmeticFunction(node.getOperator(), left.getType(), right.getType()),
+                    functionResolution.arithmeticFunction(operatorType, left.getType(), right.getType()),
                     getType(node),
                     left,
                     right);
@@ -663,7 +742,7 @@ public final class SqlToRowExpressionTranslator
             RowExpression value = process(node.getExpression(), context);
 
             if (node.isSafe()) {
-                return call(getSourceLocation(node), TRY_CAST.name(), functionAndTypeResolver.lookupCast("TRY_CAST", value.getType(), getType(node)), getType(node), value);
+                return call(getSourceLocation(node), TRY_CAST_NAME, functionAndTypeResolver.lookupCast("TRY_CAST", value.getType(), getType(node)), getType(node), value);
             }
 
             return call(getSourceLocation(node), CAST.name(), functionAndTypeResolver.lookupCast("CAST", value.getType(), getType(node)), getType(node), value);
@@ -773,7 +852,7 @@ public final class SqlToRowExpressionTranslator
                 arguments.add(constantNull(getSourceLocation(node), getType(node)));
             }
 
-            return specialForm(IF, getType(node), arguments.build());
+            return Expressions.specialForm(IF, getType(node), arguments.build());
         }
 
         @Override
@@ -796,7 +875,7 @@ public final class SqlToRowExpressionTranslator
         {
             return call(
                     EQUAL.getOperator(),
-                    functionResolution.comparisonFunction(ComparisonExpression.Operator.EQUAL, lhs.getType(), rhs.getType()),
+                    functionResolution.comparisonFunction(EQUAL, lhs.getType(), rhs.getType()),
                     BOOLEAN,
                     lhs,
                     rhs);
@@ -806,7 +885,7 @@ public final class SqlToRowExpressionTranslator
         {
             return call(
                     NOT_EQUAL.getOperator(),
-                    functionResolution.comparisonFunction(ComparisonExpression.Operator.NOT_EQUAL, lhs.getType(), rhs.getType()),
+                    functionResolution.comparisonFunction(NOT_EQUAL, lhs.getType(), rhs.getType()),
                     BOOLEAN,
                     lhs,
                     rhs);
@@ -822,7 +901,7 @@ public final class SqlToRowExpressionTranslator
         @Override
         protected RowExpression visitQuantifiedComparisonExpression(com.facebook.presto.sql.tree.QuantifiedComparisonExpression expression, Context context)
         {
-            return quantifiedComparison(
+            return Expressions.quantifiedComparison(
                     OperatorType.valueOf(expression.getOperator().name()),
                     QuantifiedComparisonExpression.Quantifier.valueOf(expression.getQuantifier().name()),
                     process(expression.getValue(), context),
@@ -838,7 +917,7 @@ public final class SqlToRowExpressionTranslator
                 RowExpression subquery = process(node.getValueList(), context);
                 checkArgument(value instanceof VariableReferenceExpression, "Unexpected expression: %s", value);
                 checkArgument(subquery instanceof VariableReferenceExpression, "Unexpected expression: %s", subquery);
-                return inSubquery((VariableReferenceExpression) value, (VariableReferenceExpression) subquery);
+                return Expressions.inSubquery((VariableReferenceExpression) value, (VariableReferenceExpression) subquery);
             }
             InListExpression values = (InListExpression) node.getValueList();
 
@@ -851,7 +930,7 @@ public final class SqlToRowExpressionTranslator
                 arguments.add(process(inValue, context));
             }
 
-            return specialForm(IN, BOOLEAN, arguments.build());
+            return Expressions.specialForm(IN, BOOLEAN, arguments.build());
         }
 
         @Override
@@ -888,7 +967,7 @@ public final class SqlToRowExpressionTranslator
             RowExpression second = process(node.getSecond(), context);
             Type returnType = getType(node);
 
-            if (!functionAndTypeManager.nullIfSpecialFormEnabled()) {
+            if (nativeExecutionEnabled) {
                 // If the first type is unknown, as per presto's NULL_IF semantics we should not infer the type using second argument.
                 // Always return a null with unknown type.
                 if (first.getType().equals(UnknownType.UNKNOWN)) {
@@ -924,9 +1003,9 @@ public final class SqlToRowExpressionTranslator
                 RowExpression equal = call(EQUAL.name(), equalsFunctionHandle, BOOLEAN, first, second);
 
                 // if (equal(cast(first as <common type>), cast(second as <common type>)), cast(null as firstType), first)
-                return specialForm(IF, returnType, equal, constantNull(returnType), firstArgWithoutCast);
+                return Expressions.specialForm(IF, returnType, equal, constantNull(returnType), firstArgWithoutCast);
             }
-            return specialForm(getSourceLocation(node), NULL_IF, returnType, first, second);
+            return Expressions.specialForm(getSourceLocation(node), NULL_IF, returnType, first, second);
         }
 
         @Override
@@ -988,21 +1067,21 @@ public final class SqlToRowExpressionTranslator
                             // prefix match
                             // x LIKE 'some string%' is same as SUBSTR(x, 1, length('some string')) = 'some string', trialing .* won't matter
                             return buildEquals(
-                                    call(functionAndTypeManager, "SUBSTR", VARCHAR, value, constant(1L, BIGINT), constant((long) matchCharacterLength - 1, BIGINT)),
+                                    call(functionAndTypeResolver, "SUBSTR", VARCHAR, value, constant(1L, BIGINT), constant((long) matchCharacterLength - 1, BIGINT)),
                                     constant(slice.slice(0, matchBytesLength - 1), VARCHAR));
                         }
                         else if (LIKE_SUFFIX_MATCH_PATTERN.matcher(patternString).matches()) {
                             // suffix match
                             // x LIKE '%some string' is same as SUBSTR(x, 'some string', -length('some string')) = 'some stirng'
                             return buildEquals(
-                                    call(functionAndTypeManager, "SUBSTR", VARCHAR, value, constant(-(long) (matchCharacterLength - 1), BIGINT)),
+                                    call(functionAndTypeResolver, "SUBSTR", VARCHAR, value, constant(-(long) (matchCharacterLength - 1), BIGINT)),
                                     constant(slice.slice(1, matchBytesLength - 1), VARCHAR));
                         }
                         else if (LIKE_SIMPLE_EXISTS_PATTERN.matcher(patternString).matches()) {
                             // pattern should just exist in the string ignoring leading and trailing stuff
                             // x LIKE '%some string%' is same as STRPOS(x, 'some string') != 0
                             return buildNotEquals(
-                                    call(functionAndTypeManager, "STRPOS", BIGINT, value, constant(slice.slice(1, matchBytesLength - 2), VARCHAR)),
+                                    call(functionAndTypeResolver, "STRPOS", BIGINT, value, constant(slice.slice(1, matchBytesLength - 2), VARCHAR)),
                                     constant(0L, BIGINT));
                         }
                     }

@@ -46,9 +46,15 @@ public interface StandardFunctionResolution
 
     FunctionHandle comparisonFunction(OperatorType operator, Type leftType, Type rightType);
 
+    boolean supportsLikePatternFunction();
+
     boolean isComparisonFunction(FunctionHandle functionHandle);
 
     boolean isEqualsFunction(FunctionHandle functionHandle);
+
+    FunctionHandle likeVarcharVarcharFunction();
+
+    FunctionHandle likeVarcharVarcharVarcharFunction();
 
     FunctionHandle betweenFunction(Type valueType, Type lowerBoundType, Type upperBoundType);
 

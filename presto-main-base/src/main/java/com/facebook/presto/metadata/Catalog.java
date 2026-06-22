@@ -73,6 +73,7 @@ public class Catalog
         requireNonNull(connectorName, "connectorName is null");
         this.catalogContext = new CatalogContext(catalogName, connectorName);
     }
+
     public String getCatalogName()
     {
         return catalogName;

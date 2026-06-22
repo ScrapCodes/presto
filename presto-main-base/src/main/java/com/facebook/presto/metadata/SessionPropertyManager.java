@@ -164,120 +164,6 @@ public final class SessionPropertyManager
                 new SessionPropertyProviderConfig());
     }
 
-    public void loadSessionPropertyProviders(AuthClientConfigs authClientConfigs)
-            throws Exception
-    {
-        if (!sessionPropertyProvidersLoading.compareAndSet(false, true)) {
-            return;
-        }
-
-        for (File file : listFiles(configDir)) {
-            if (file.isFile() && file.getName().endsWith(".properties")) {
-                String sessionPropertyProviderName = getNameWithoutExtension(file.getName());
-                Map<String, String> properties = loadProperties(file);
-                checkState(!isNullOrEmpty(properties.get(SESSION_PROPERTY_PROVIDER_NAME)),
-                        "Session property manager configuration %s does not contain %s",
-                        file.getAbsoluteFile(),
-                        SESSION_PROPERTY_PROVIDER_NAME);
-                properties = new HashMap<>(properties);
-                properties.remove(SESSION_PROPERTY_PROVIDER_NAME);
-                loadSessionPropertyProvider(sessionPropertyProviderName, properties, functionAndTypeManager, nodeManager, authClientConfigs);
-            }
-        }
-    }
-
-    public void loadSessionPropertyProvider(
-            String sessionPropertyProviderName,
-            Map<String, String> properties,
-            Optional<TypeManager> typeManager,
-            Optional<NodeManager> nodeManager,
-            AuthClientConfigs authClientConfigs)
-    {
-        log.info("-- Loading %s session property provider --", sessionPropertyProviderName);
-        WorkerSessionPropertyProviderFactory factory = workerSessionPropertyProviderFactories.get(sessionPropertyProviderName);
-        checkState(factory != null, "No factory for session property provider : " + sessionPropertyProviderName);
-        WorkerSessionPropertyProvider sessionPropertyProvider = factory.create(new SessionPropertyContext(typeManager, nodeManager, authClientConfigs), properties);
-        if (workerSessionPropertyProviders.putIfAbsent(sessionPropertyProviderName, sessionPropertyProvider) != null) {
-            throw new IllegalArgumentException("System session property provider is already registered for property provider : " + sessionPropertyProviderName);
-        }
-        log.info("-- Added session property provider [%s] --", sessionPropertyProviderName);
-    }
-
-    @VisibleForTesting
-    public Map<String, WorkerSessionPropertyProvider> getWorkerSessionPropertyProviders()
-    {
-        return ImmutableMap.copyOf(workerSessionPropertyProviders);
-    }
-
-    public void addSessionPropertyProviderFactory(WorkerSessionPropertyProviderFactory factory)
-    {
-        if (workerSessionPropertyProviderFactories.putIfAbsent(factory.getName(), factory) != null) {
-            throw new IllegalArgumentException(format("System Session property provider factory" + factory.getName() + "is already registered"));
-        }
-    }
-
-    public void addSystemSessionProperties(List<PropertyMetadata<?>> systemSessionProperties)
-    {
-        systemSessionProperties
-                .forEach(this::addSystemSessionProperty);
-    }
-
-    public void addSystemSessionProperty(PropertyMetadata<?> sessionProperty)
-    {
-        requireNonNull(sessionProperty, "sessionProperty is null");
-        checkState(systemSessionProperties.put(sessionProperty.getName(), sessionProperty) == null,
-                "System session property '%s' are already registered", sessionProperty.getName());
-    }
-
-    public void addConnectorSessionProperties(ConnectorId connectorId, List<PropertyMetadata<?>> properties)
-    {
-        requireNonNull(connectorId, "connectorId is null");
-        requireNonNull(properties, "properties is null");
-
-        Map<String, PropertyMetadata<?>> propertiesByName = Maps.uniqueIndex(properties, PropertyMetadata::getName);
-        checkState(connectorSessionProperties.putIfAbsent(connectorId, propertiesByName) == null, "Session properties for connectorId '%s' are already registered", connectorId);
-    }
-
-    public void removeConnectorSessionProperties(ConnectorId connectorId)
-    {
-        connectorSessionProperties.remove(connectorId);
-    }
-
-    public Optional<PropertyMetadata<?>> getSystemSessionPropertyMetadata(String name)
-    {
-        requireNonNull(name, "name is null");
-        if (systemSessionProperties.get(name) == null) {
-            return Optional.ofNullable(memoizedWorkerSessionProperties.get().get(name));
-        }
-        return Optional.ofNullable(systemSessionProperties.get(name));
-    }
-
-    public Optional<PropertyMetadata<?>> getConnectorSessionPropertyMetadata(ConnectorId connectorId, String propertyName)
-    {
-        requireNonNull(connectorId, "connectorId is null");
-        requireNonNull(propertyName, "propertyName is null");
-        Map<String, PropertyMetadata<?>> properties = connectorSessionProperties.get(connectorId);
-        if (properties == null || properties.isEmpty()) {
-            throw new PrestoException(INVALID_SESSION_PROPERTY, "Unknown connector " + connectorId);
-        }
-
-        return Optional.ofNullable(properties.get(propertyName));
-    }
-
-    private Map<String, PropertyMetadata<?>> getWorkerSessionProperties()
-    {
-        List<PropertyMetadata<?>> workerSessionPropertiesList = workerSessionPropertyProviders.values().stream()
-                .flatMap(manager -> manager.getSessionProperties().stream())
-                .collect(toImmutableList());
-        Map<String, PropertyMetadata<?>> workerSessionProperties = new ConcurrentHashMap<>();
-        workerSessionPropertiesList.forEach(sessionProperty -> {
-            requireNonNull(sessionProperty, "sessionProperty is null");
-            // TODO: Implement fail fast in case of duplicate entries.
-            workerSessionProperties.put(sessionProperty.getName(), sessionProperty);
-        });
-        return workerSessionProperties;
-    }
-
     private static List<File> listFiles(File dir)
     {
         if (dir != null && dir.isDirectory()) {
@@ -287,97 +173,6 @@ public final class SessionPropertyManager
             }
         }
         return ImmutableList.of();
-    }
-
-    public List<SessionPropertyValue> getAllSessionProperties(Session session, Map<String, ConnectorId> catalogs)
-    {
-        requireNonNull(session, "session is null");
-
-        ImmutableList.Builder<SessionPropertyValue> sessionPropertyValues = ImmutableList.builder();
-        Map<String, String> systemProperties = session.getSystemProperties();
-        for (PropertyMetadata<?> property : new TreeMap<>(systemSessionProperties).values()) {
-            String defaultValue = firstNonNull(property.getDefaultValue(), "").toString();
-            String value = systemProperties.getOrDefault(property.getName(), defaultValue);
-            sessionPropertyValues.add(new SessionPropertyValue(
-                    value,
-                    defaultValue,
-                    property.getName(),
-                    Optional.empty(),
-                    property.getName(),
-                    property.getDescription(),
-                    property.getSqlType().getDisplayName(),
-                    property.isHidden()));
-        }
-
-        for (Entry<String, ConnectorId> entry : new TreeMap<>(catalogs).entrySet()) {
-            String catalog = entry.getKey();
-            ConnectorId connectorId = entry.getValue();
-            Map<String, String> connectorProperties = session.getConnectorProperties(connectorId);
-
-            for (PropertyMetadata<?> property : new TreeMap<>(connectorSessionProperties.get(connectorId)).values()) {
-                String defaultValue = firstNonNull(property.getDefaultValue(), "").toString();
-                String value = connectorProperties.getOrDefault(property.getName(), defaultValue);
-
-                sessionPropertyValues.add(new SessionPropertyValue(
-                        value,
-                        defaultValue,
-                        catalog + "." + property.getName(),
-                        Optional.of(catalog),
-                        property.getName(),
-                        property.getDescription(),
-                        property.getSqlType().getDisplayName(),
-                        property.isHidden()));
-            }
-        }
-
-        for (PropertyMetadata<?> property : new TreeMap<>(memoizedWorkerSessionProperties.get()).values()) {
-            String defaultValue = firstNonNull(property.getDefaultValue(), "").toString();
-            String value = systemProperties.getOrDefault(property.getName(), defaultValue);
-            sessionPropertyValues.add(new SessionPropertyValue(
-                    value,
-                    defaultValue,
-                    property.getName(),
-                    Optional.empty(),
-                    property.getName(),
-                    property.getDescription(),
-                    property.getSqlType().getDisplayName(),
-                    property.isHidden()));
-        }
-        return sessionPropertyValues.build();
-    }
-
-    public <T> T decodeSystemPropertyValue(String name, @Nullable String value, Class<T> type)
-    {
-        PropertyMetadata<?> property = getSystemSessionPropertyMetadata(name)
-                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + name));
-
-        return decodePropertyValue(name, value, type, property);
-    }
-
-    public <T> T decodeCatalogPropertyValue(ConnectorId connectorId, String catalogName, String propertyName, @Nullable String propertyValue, Class<T> type)
-    {
-        String fullPropertyName = catalogName + "." + propertyName;
-        PropertyMetadata<?> property = getConnectorSessionPropertyMetadata(connectorId, propertyName)
-                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + fullPropertyName));
-
-        return decodePropertyValue(fullPropertyName, propertyValue, type, property);
-    }
-
-    public void validateSystemSessionProperty(String propertyName, String propertyValue)
-    {
-        PropertyMetadata<?> propertyMetadata = getSystemSessionPropertyMetadata(propertyName)
-                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + propertyName));
-
-        decodePropertyValue(propertyName, propertyValue, propertyMetadata.getJavaType(), propertyMetadata);
-    }
-
-    public void validateCatalogSessionProperty(ConnectorId connectorId, String catalogName, String propertyName, String propertyValue)
-    {
-        String fullPropertyName = catalogName + "." + propertyName;
-        PropertyMetadata<?> propertyMetadata = getConnectorSessionPropertyMetadata(connectorId, propertyName)
-                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + fullPropertyName));
-
-        decodePropertyValue(fullPropertyName, propertyValue, propertyMetadata.getJavaType(), propertyMetadata);
     }
 
     private static <T> T decodePropertyValue(String fullPropertyName, @Nullable String propertyValue, Class<T> type, PropertyMetadata<?> metadata)
@@ -531,6 +326,211 @@ public final class SessionPropertyManager
             return Byte.class;
         }
         throw new PrestoException(INVALID_SESSION_PROPERTY, format("Session property map key type %s is not supported", type));
+    }
+
+    public void loadSessionPropertyProviders(AuthClientConfigs authClientConfigs)
+            throws Exception
+    {
+        if (!sessionPropertyProvidersLoading.compareAndSet(false, true)) {
+            return;
+        }
+
+        for (File file : listFiles(configDir)) {
+            if (file.isFile() && file.getName().endsWith(".properties")) {
+                String sessionPropertyProviderName = getNameWithoutExtension(file.getName());
+                Map<String, String> properties = loadProperties(file);
+                checkState(!isNullOrEmpty(properties.get(SESSION_PROPERTY_PROVIDER_NAME)),
+                        "Session property manager configuration %s does not contain %s",
+                        file.getAbsoluteFile(),
+                        SESSION_PROPERTY_PROVIDER_NAME);
+                properties = new HashMap<>(properties);
+                properties.remove(SESSION_PROPERTY_PROVIDER_NAME);
+                loadSessionPropertyProvider(sessionPropertyProviderName, properties, functionAndTypeManager, nodeManager, authClientConfigs);
+            }
+        }
+    }
+
+    public void loadSessionPropertyProvider(
+            String sessionPropertyProviderName,
+            Map<String, String> properties,
+            Optional<TypeManager> typeManager,
+            Optional<NodeManager> nodeManager,
+            AuthClientConfigs authClientConfigs)
+    {
+        log.info("-- Loading %s session property provider --", sessionPropertyProviderName);
+        WorkerSessionPropertyProviderFactory factory = workerSessionPropertyProviderFactories.get(sessionPropertyProviderName);
+        checkState(factory != null, "No factory for session property provider : " + sessionPropertyProviderName);
+        WorkerSessionPropertyProvider sessionPropertyProvider = factory.create(new SessionPropertyContext(typeManager, nodeManager, authClientConfigs), properties);
+        if (workerSessionPropertyProviders.putIfAbsent(sessionPropertyProviderName, sessionPropertyProvider) != null) {
+            throw new IllegalArgumentException("System session property provider is already registered for property provider : " + sessionPropertyProviderName);
+        }
+        log.info("-- Added session property provider [%s] --", sessionPropertyProviderName);
+    }
+
+    @VisibleForTesting
+    public Map<String, WorkerSessionPropertyProvider> getWorkerSessionPropertyProviders()
+    {
+        return ImmutableMap.copyOf(workerSessionPropertyProviders);
+    }
+
+    public void addSessionPropertyProviderFactory(WorkerSessionPropertyProviderFactory factory)
+    {
+        if (workerSessionPropertyProviderFactories.putIfAbsent(factory.getName(), factory) != null) {
+            throw new IllegalArgumentException(format("System Session property provider factory" + factory.getName() + "is already registered"));
+        }
+    }
+
+    public void addSystemSessionProperties(List<PropertyMetadata<?>> systemSessionProperties)
+    {
+        systemSessionProperties
+                .forEach(this::addSystemSessionProperty);
+    }
+
+    public void addSystemSessionProperty(PropertyMetadata<?> sessionProperty)
+    {
+        requireNonNull(sessionProperty, "sessionProperty is null");
+        checkState(systemSessionProperties.put(sessionProperty.getName(), sessionProperty) == null,
+                "System session property '%s' are already registered", sessionProperty.getName());
+    }
+
+    public void addConnectorSessionProperties(ConnectorId connectorId, List<PropertyMetadata<?>> properties)
+    {
+        requireNonNull(connectorId, "connectorId is null");
+        requireNonNull(properties, "properties is null");
+
+        Map<String, PropertyMetadata<?>> propertiesByName = Maps.uniqueIndex(properties, PropertyMetadata::getName);
+        checkState(connectorSessionProperties.putIfAbsent(connectorId, propertiesByName) == null, "Session properties for connectorId '%s' are already registered", connectorId);
+    }
+
+    public void removeConnectorSessionProperties(ConnectorId connectorId)
+    {
+        connectorSessionProperties.remove(connectorId);
+    }
+
+    public Optional<PropertyMetadata<?>> getSystemSessionPropertyMetadata(String name)
+    {
+        requireNonNull(name, "name is null");
+        if (systemSessionProperties.get(name) == null) {
+            return Optional.ofNullable(memoizedWorkerSessionProperties.get().get(name));
+        }
+        return Optional.ofNullable(systemSessionProperties.get(name));
+    }
+
+    public Optional<PropertyMetadata<?>> getConnectorSessionPropertyMetadata(ConnectorId connectorId, String propertyName)
+    {
+        requireNonNull(connectorId, "connectorId is null");
+        requireNonNull(propertyName, "propertyName is null");
+        Map<String, PropertyMetadata<?>> properties = connectorSessionProperties.get(connectorId);
+        if (properties == null || properties.isEmpty()) {
+            throw new PrestoException(INVALID_SESSION_PROPERTY, "Unknown connector " + connectorId);
+        }
+
+        return Optional.ofNullable(properties.get(propertyName));
+    }
+
+    private Map<String, PropertyMetadata<?>> getWorkerSessionProperties()
+    {
+        List<PropertyMetadata<?>> workerSessionPropertiesList = workerSessionPropertyProviders.values().stream()
+                .flatMap(manager -> manager.getSessionProperties().stream())
+                .collect(toImmutableList());
+        Map<String, PropertyMetadata<?>> workerSessionProperties = new ConcurrentHashMap<>();
+        workerSessionPropertiesList.forEach(sessionProperty -> {
+            requireNonNull(sessionProperty, "sessionProperty is null");
+            // TODO: Implement fail fast in case of duplicate entries.
+            workerSessionProperties.put(sessionProperty.getName(), sessionProperty);
+        });
+        return workerSessionProperties;
+    }
+
+    public List<SessionPropertyValue> getAllSessionProperties(Session session, Map<String, ConnectorId> catalogs)
+    {
+        requireNonNull(session, "session is null");
+
+        ImmutableList.Builder<SessionPropertyValue> sessionPropertyValues = ImmutableList.builder();
+        Map<String, String> systemProperties = session.getSystemProperties();
+        for (PropertyMetadata<?> property : new TreeMap<>(systemSessionProperties).values()) {
+            String defaultValue = firstNonNull(property.getDefaultValue(), "").toString();
+            String value = systemProperties.getOrDefault(property.getName(), defaultValue);
+            sessionPropertyValues.add(new SessionPropertyValue(
+                    value,
+                    defaultValue,
+                    property.getName(),
+                    Optional.empty(),
+                    property.getName(),
+                    property.getDescription(),
+                    property.getSqlType().getDisplayName(),
+                    property.isHidden()));
+        }
+
+        for (Entry<String, ConnectorId> entry : new TreeMap<>(catalogs).entrySet()) {
+            String catalog = entry.getKey();
+            ConnectorId connectorId = entry.getValue();
+            Map<String, String> connectorProperties = session.getConnectorProperties(connectorId);
+
+            for (PropertyMetadata<?> property : new TreeMap<>(connectorSessionProperties.get(connectorId)).values()) {
+                String defaultValue = firstNonNull(property.getDefaultValue(), "").toString();
+                String value = connectorProperties.getOrDefault(property.getName(), defaultValue);
+
+                sessionPropertyValues.add(new SessionPropertyValue(
+                        value,
+                        defaultValue,
+                        catalog + "." + property.getName(),
+                        Optional.of(catalog),
+                        property.getName(),
+                        property.getDescription(),
+                        property.getSqlType().getDisplayName(),
+                        property.isHidden()));
+            }
+        }
+
+        for (PropertyMetadata<?> property : new TreeMap<>(memoizedWorkerSessionProperties.get()).values()) {
+            String defaultValue = firstNonNull(property.getDefaultValue(), "").toString();
+            String value = systemProperties.getOrDefault(property.getName(), defaultValue);
+            sessionPropertyValues.add(new SessionPropertyValue(
+                    value,
+                    defaultValue,
+                    property.getName(),
+                    Optional.empty(),
+                    property.getName(),
+                    property.getDescription(),
+                    property.getSqlType().getDisplayName(),
+                    property.isHidden()));
+        }
+        return sessionPropertyValues.build();
+    }
+
+    public <T> T decodeSystemPropertyValue(String name, @Nullable String value, Class<T> type)
+    {
+        PropertyMetadata<?> property = getSystemSessionPropertyMetadata(name)
+                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + name));
+
+        return decodePropertyValue(name, value, type, property);
+    }
+
+    public <T> T decodeCatalogPropertyValue(ConnectorId connectorId, String catalogName, String propertyName, @Nullable String propertyValue, Class<T> type)
+    {
+        String fullPropertyName = catalogName + "." + propertyName;
+        PropertyMetadata<?> property = getConnectorSessionPropertyMetadata(connectorId, propertyName)
+                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + fullPropertyName));
+
+        return decodePropertyValue(fullPropertyName, propertyValue, type, property);
+    }
+
+    public void validateSystemSessionProperty(String propertyName, String propertyValue)
+    {
+        PropertyMetadata<?> propertyMetadata = getSystemSessionPropertyMetadata(propertyName)
+                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + propertyName));
+
+        decodePropertyValue(propertyName, propertyValue, propertyMetadata.getJavaType(), propertyMetadata);
+    }
+
+    public void validateCatalogSessionProperty(ConnectorId connectorId, String catalogName, String propertyName, String propertyValue)
+    {
+        String fullPropertyName = catalogName + "." + propertyName;
+        PropertyMetadata<?> propertyMetadata = getConnectorSessionPropertyMetadata(connectorId, propertyName)
+                .orElseThrow(() -> new PrestoException(INVALID_SESSION_PROPERTY, "Unknown session property " + fullPropertyName));
+
+        decodePropertyValue(fullPropertyName, propertyValue, propertyMetadata.getJavaType(), propertyMetadata);
     }
 
     public static class SessionPropertyValue

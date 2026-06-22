@@ -43,6 +43,7 @@ import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.iterative.rule.test.RuleTester;
 import com.facebook.presto.sql.planner.optimizations.ExternalCallExpressionChecker;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.SqlToRowExpressionTranslator;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.NodeRef;
@@ -648,7 +649,8 @@ public class TestPlanRemoteProjections
                 expression,
                 expressionTypes,
                 ImmutableMap.of(),
-                getFunctionAndTypeManager(),
-                TEST_SESSION);
+                getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                new FunctionResolution(getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                TEST_SESSION.toConnectorSession());
     }
 }

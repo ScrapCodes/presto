@@ -129,6 +129,16 @@ public final class PolymorphicScalarFunctionBuilder
         };
     }
 
+    public static PolymorphicScalarFunctionBuilder builder(Class<?> clazz, OperatorType operatorType)
+    {
+        return new PolymorphicScalarFunctionBuilder(clazz, operatorType);
+    }
+
+    public static PolymorphicScalarFunctionBuilder builder(Class<?> clazz)
+    {
+        return new PolymorphicScalarFunctionBuilder(clazz);
+    }
+
     public static <T> Function<SpecializeContext, List<Object>> constant(T value)
     {
         return context -> ImmutableList.of(value);

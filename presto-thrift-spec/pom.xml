@@ -26,6 +26,12 @@
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main-base</artifactId>
         </dependency>
+	
+	<dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-optimizer-common</artifactId>
+            <version>0.298-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -37,6 +43,7 @@
                     <ignoredDependencies>
                         <ignoredDependency>com.facebook.presto:presto-common</ignoredDependency>
                         <ignoredDependency>com.facebook.presto:presto-main-base</ignoredDependency>
+			<ignoredDependency>com.facebook.presto:presto-optimizer-common</ignoredDependency>
                     </ignoredDependencies>
                 </configuration>
             </plugin>

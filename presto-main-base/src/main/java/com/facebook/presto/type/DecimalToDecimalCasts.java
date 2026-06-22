@@ -16,6 +16,7 @@ package com.facebook.presto.type;
 import com.facebook.presto.annotation.UsedByGeneratedCode;
 import com.facebook.presto.common.type.DecimalType;
 import com.facebook.presto.common.type.Decimals;
+import com.facebook.presto.metadata.PolymorphicScalarFunctionBuilder;
 import com.facebook.presto.metadata.SignatureBuilder;
 import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.spi.PrestoException;
@@ -51,7 +52,7 @@ public final class DecimalToDecimalCasts
             .build();
 
     // TODO: filtering mechanism could be used to return NoOp method when only precision is increased
-    public static final SqlScalarFunction DECIMAL_TO_DECIMAL_CAST = SqlScalarFunction.builder(DecimalToDecimalCasts.class, CAST)
+    public static final SqlScalarFunction DECIMAL_TO_DECIMAL_CAST = PolymorphicScalarFunctionBuilder.builder(DecimalToDecimalCasts.class, CAST)
             .signature(SIGNATURE)
             .deterministic(true)
             .choice(choice -> choice

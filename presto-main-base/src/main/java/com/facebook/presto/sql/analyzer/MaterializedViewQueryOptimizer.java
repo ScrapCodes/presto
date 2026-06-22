@@ -675,7 +675,7 @@ public class MaterializedViewQueryOptimizer
         protected Node visitRelation(Relation node, Void context)
         {
             if (materializedViewInfo.getBaseTable().isPresent() && resolveTableName(node, session, metadata)
-                        .equals(resolveTableName(materializedViewInfo.getBaseTable().get(), session, metadata))) {
+                    .equals(resolveTableName(materializedViewInfo.getBaseTable().get(), session, metadata))) {
                 return materializedView;
             }
             throw new IllegalStateException("Mismatching table or non-supporting relation format in base query");
@@ -839,8 +839,9 @@ public class MaterializedViewQueryOptimizer
                     coercedMaybe,
                     coercedExpressionAnalysis.getExpressionTypes(),
                     ImmutableMap.of(),
-                    metadata.getFunctionAndTypeManager(),
-                    session);
+                    metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                    new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                    session.toConnectorSession());
         }
 
         ExpressionAnalysis getExpressionAnalysis(Expression expression, Scope scope)

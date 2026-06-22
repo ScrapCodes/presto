@@ -242,7 +242,7 @@ public class RewriteCaseToMap
             if (lastArg != null && !lastArg.equals(constantNull(thens.get(0).getType()))) {
                 // Null could be a legit value so we coalesce to the else part only if there was no key match
                 RowExpression keyArray = call("ARRAY", functionResolution.arrayConstructor(whens.stream().map(x -> x.getType()).collect(Collectors.toList())), new ArrayType(whens.get(0).getType()), whens);
-                RowExpression contains = call(functionAndTypeManager, "contains", BOOLEAN, keyArray, checkExpr);
+                RowExpression contains = call(functionAndTypeManager.getFunctionAndTypeResolver(), "contains", BOOLEAN, keyArray, checkExpr);
                 return coalesce(mapLookup, specialForm(IF, mapLookup.getType(), contains, constant(null, mapLookup.getType()), lastArg));
             }
 
@@ -261,8 +261,8 @@ public class RewriteCaseToMap
             MethodHandle keyHashcode =
                     functionAndTypeManager.getJavaScalarFunctionImplementation(
                             functionAndTypeManager.resolveOperator(OperatorType.HASH_CODE, fromTypes(keyType))).getMethodHandle();
-            RowExpression map = call(functionAndTypeManager, "MAP", new MapType(keyType, valueType, keyEquals, keyHashcode), keyArray, valueArray);
-            return call(functionAndTypeManager, "element_at", valueType, map, mapIndex);
+            RowExpression map = call(functionAndTypeManager.getFunctionAndTypeResolver(), "MAP", new MapType(keyType, valueType, keyEquals, keyHashcode), keyArray, valueArray);
+            return call(functionAndTypeManager.getFunctionAndTypeResolver(), "element_at", valueType, map, mapIndex);
         }
     }
 

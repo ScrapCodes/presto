@@ -106,7 +106,7 @@ public class RewriteSpatialPartitioningAggregation
                 else {
                     envelopeAssignments.put(
                             envelopeVariable,
-                            call(metadata.getFunctionAndTypeManager(), "ST_Envelope", geometryType, geometry));
+                            call(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(), "ST_Envelope", geometryType, geometry));
                 }
                 aggregations.put(entry.getKey(),
                         new Aggregation(

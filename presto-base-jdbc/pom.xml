@@ -182,7 +182,14 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
+	<dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-optimizer-common</artifactId>
+            <version>0.298-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+
+	<dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main-base</artifactId>
             <scope>test</scope>

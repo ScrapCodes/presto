@@ -156,7 +156,7 @@ public class CombineApproxDistinctFunctions
                 .collect(Collectors.toList());
 
         return call(
-                functionAndTypeManager,
+                functionAndTypeManager.getFunctionAndTypeResolver(),
                 ARRAY_CONSTRUCTOR,
                 new ArrayType(expressions.get(0).getType()),
                 expressions);
@@ -170,7 +170,7 @@ public class CombineApproxDistinctFunctions
         Type setType = new ArrayType(arrayType);
 
         CallExpression setAggCall = call(
-                functionAndTypeManager,
+                functionAndTypeManager.getFunctionAndTypeResolver(),
                 SET_AGG,
                 setType,
                 ImmutableList.of(arrayVariableReference));
@@ -238,7 +238,7 @@ public class CombineApproxDistinctFunctions
             Type arrayArrayType = new ArrayType(arrayType);
 
             CallExpression transposeCall = call(
-                    functionAndTypeManager,
+                    functionAndTypeManager.getFunctionAndTypeResolver(),
                     ARRAY_TRANSPOSE,
                     arrayArrayType,
                     ImmutableList.of(setAggVariableReference));
@@ -251,22 +251,22 @@ public class CombineApproxDistinctFunctions
                             x -> aggregationVariableMap.get(candidateList.get(x)),
                             x -> {
                                 CallExpression elementAt = call(
-                                        functionAndTypeManager,
+                                        functionAndTypeManager.getFunctionAndTypeResolver(),
                                         ELEMENT_AT,
                                         arrayType,
                                         ImmutableList.of(transposeVariableReference, constant((long) x + 1, BIGINT)));
                                 CallExpression removeNullsCall = call(
-                                        functionAndTypeManager,
+                                        functionAndTypeManager.getFunctionAndTypeResolver(),
                                         REMOVE_NULLS,
                                         arrayType,
                                         ImmutableList.of(elementAt));
                                 CallExpression arrayDistinctCall = call(
-                                        functionAndTypeManager,
+                                        functionAndTypeManager.getFunctionAndTypeResolver(),
                                         ARRAY_DISTINCT,
                                         arrayType,
                                         ImmutableList.of(removeNullsCall));
                                 CallExpression cardinalityCall = call(
-                                        functionAndTypeManager,
+                                        functionAndTypeManager.getFunctionAndTypeResolver(),
                                         CARDINALITY,
                                         BIGINT,
                                         ImmutableList.of(arrayDistinctCall));

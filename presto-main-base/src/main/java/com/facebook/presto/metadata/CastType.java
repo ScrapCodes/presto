@@ -20,7 +20,7 @@ import static com.facebook.presto.metadata.BuiltInTypeAndFunctionNamespaceManage
 import static com.facebook.presto.operator.scalar.JsonStringToArrayCast.JSON_STRING_TO_ARRAY_NAME;
 import static com.facebook.presto.operator.scalar.JsonStringToMapCast.JSON_STRING_TO_MAP_NAME;
 import static com.facebook.presto.operator.scalar.JsonStringToRowCast.JSON_STRING_TO_ROW_NAME;
-import static com.facebook.presto.operator.scalar.TryCastFunction.TRY_CAST_NAME;
+import static com.facebook.presto.sql.planner.Constants.TRY_CAST_NAME;
 import static java.lang.String.format;
 
 public enum CastType

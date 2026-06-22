@@ -983,8 +983,8 @@ public class HashGenerationOptimizer
 
         private RowExpression getHashFunctionCall(RowExpression previousHashValue, VariableReferenceExpression variable)
         {
-            CallExpression functionCall = call(functionAndTypeManager, HASH_CODE, BIGINT, variable);
-            return call(functionAndTypeManager, "combine_hash", BIGINT, previousHashValue, orNullHashCode(functionCall));
+            CallExpression functionCall = call(functionAndTypeManager.getFunctionAndTypeResolver(), HASH_CODE, BIGINT, variable);
+            return call(functionAndTypeManager.getFunctionAndTypeResolver(), "combine_hash", BIGINT, previousHashValue, orNullHashCode(functionCall));
         }
 
         @Override

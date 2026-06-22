@@ -188,7 +188,7 @@ public class CombineApproxPercentileFunctions
         List<RowExpression> percentileArray = aggregations.stream().map(x -> x.getArguments().get(getPercentilePosition(x.getFunctionHandle()))).collect(Collectors.toList());
 
         return call(
-                functionAndTypeManager,
+                functionAndTypeManager.getFunctionAndTypeResolver(),
                 ARRAY_CONSTRUCTOR,
                 new ArrayType(percentileArray.get(0).getType()),
                 percentileArray);
@@ -201,7 +201,7 @@ public class CombineApproxPercentileFunctions
         List<RowExpression> newAggCallArguments = changePercentileArgument(aggregationBeforeMerge.getCall().getArguments(), arrayVariableReference, percentilePosition);
         Type colType = aggregationBeforeMerge.getCall().getArguments().get(0).getType();
         CallExpression approxPercentileCall = call(
-                functionAndTypeManager,
+                functionAndTypeManager.getFunctionAndTypeResolver(),
                 APPROX_PERCENTILE,
                 new ArrayType(colType),
                 newAggCallArguments);
@@ -281,7 +281,7 @@ public class CombineApproxPercentileFunctions
                     IntStream.range(0, candidateList.size()).boxed().collect(ImmutableMap.toImmutableMap(
                             x -> aggregationVariableMap.get(candidateList.get(x)),
                             x -> call(
-                                    functionAndTypeManager,
+                                    functionAndTypeManager.getFunctionAndTypeResolver(),
                                     ELEMENT_AT,
                                     candidateList.get(x).getArguments().get(0).getType(),
                                     ImmutableList.of(newVariableReference, constant((long) x + 1, BIGINT)))));

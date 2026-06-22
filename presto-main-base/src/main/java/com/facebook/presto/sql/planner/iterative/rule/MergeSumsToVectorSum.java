@@ -168,7 +168,7 @@ public class MergeSumsToVectorSum
 
             ArrayType arrayType = new ArrayType(elemType);
             CallExpression arrayConstructorCall = call(
-                    functionAndTypeManager,
+                    functionAndTypeManager.getFunctionAndTypeResolver(),
                     ARRAY_CONSTRUCTOR,
                     arrayType,
                     arrayElements);
@@ -177,7 +177,7 @@ public class MergeSumsToVectorSum
 
             // Create vector_sum(array_var) aggregation
             CallExpression vectorSumCall = call(
-                    functionAndTypeManager,
+                    functionAndTypeManager.getFunctionAndTypeResolver(),
                     VECTOR_SUM,
                     arrayType,
                     ImmutableList.of(arrayVar));
@@ -193,7 +193,7 @@ public class MergeSumsToVectorSum
             for (int i = 0; i < entries.size(); i++) {
                 VariableReferenceExpression originalVar = entries.get(i).getKey();
                 CallExpression elementAtCall = call(
-                        functionAndTypeManager,
+                        functionAndTypeManager.getFunctionAndTypeResolver(),
                         ELEMENT_AT,
                         elemType,
                         ImmutableList.of(vectorSumVar, constant((long) (i + 1), BIGINT)));

@@ -22,6 +22,7 @@ import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.TypeProvider;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.SqlToRowExpressionTranslator;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.NodeRef;
@@ -147,7 +148,8 @@ public class TestCommonSubExpressionRewriter
                 expression,
                 expressionTypes,
                 ImmutableMap.of(),
-                METADATA.getFunctionAndTypeManager(),
-                SESSION);
+                METADATA.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                new FunctionResolution(METADATA.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                SESSION.toConnectorSession());
     }
 }

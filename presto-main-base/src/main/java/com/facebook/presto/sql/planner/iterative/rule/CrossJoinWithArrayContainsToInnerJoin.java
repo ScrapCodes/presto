@@ -139,7 +139,7 @@ public class CrossJoinWithArrayContainsToInnerJoin
         boolean arrayAtLeftInput = leftInput.contains(array);
         PlanNode inputWithArray = arrayAtLeftInput ? joinNode.getLeft() : joinNode.getRight();
 
-        CallExpression arrayDistinct = call(functionAndTypeManager, "array_distinct", new ArrayType(element.getType()), array);
+        CallExpression arrayDistinct = call(functionAndTypeManager.getFunctionAndTypeResolver(), "array_distinct", new ArrayType(element.getType()), array);
         VariableReferenceExpression arrayDistinctVariable = context.getVariableAllocator().newVariable(arrayDistinct);
         PlanNode project = PlannerUtils.addProjections(inputWithArray, context.getIdAllocator(), ImmutableMap.of(arrayDistinctVariable, arrayDistinct));
         VariableReferenceExpression unnestVariable = context.getVariableAllocator().newVariable("field", element.getType());

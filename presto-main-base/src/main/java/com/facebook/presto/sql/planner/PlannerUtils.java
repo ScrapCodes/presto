@@ -187,9 +187,9 @@ public class PlannerUtils
 
         RowExpression result = constant(INITIAL_HASH_VALUE, BIGINT);
         for (VariableReferenceExpression variable : variables) {
-            RowExpression hashField = call(functionAndTypeManager, HASH_CODE, BIGINT, variable);
+            RowExpression hashField = call(functionAndTypeManager.getFunctionAndTypeResolver(), HASH_CODE, BIGINT, variable);
             hashField = orNullHashCode(hashField);
-            result = call(functionAndTypeManager, "combine_hash", BIGINT, result, hashField);
+            result = call(functionAndTypeManager.getFunctionAndTypeResolver(), "combine_hash", BIGINT, result, hashField);
         }
         return Optional.of(result);
     }
@@ -289,7 +289,7 @@ public class PlannerUtils
 
     public static PlanNode addAggregation(PlanNode planNode, FunctionAndTypeManager functionAndTypeManager, PlanNodeIdAllocator planNodeIdAllocator, VariableAllocator variableAllocator, String aggregationFunction, Type type, List<VariableReferenceExpression> groupingKeys, VariableReferenceExpression resultVariable, RowExpression... args)
     {
-        CallExpression callExpression = call(functionAndTypeManager, aggregationFunction, type, args);
+        CallExpression callExpression = call(functionAndTypeManager.getFunctionAndTypeResolver(), aggregationFunction, type, args);
         Map<VariableReferenceExpression, AggregationNode.Aggregation> aggregationMap = ImmutableMap.of(
                 resultVariable,
                 new AggregationNode.Aggregation(
@@ -773,12 +773,12 @@ public class PlannerUtils
     {
         int partitionCount = getHashPartitionCount(session);
         RowExpression randomNumber = call(
-                functionAndTypeManager,
+                functionAndTypeManager.getFunctionAndTypeResolver(),
                 "random",
                 BIGINT,
                 constant((long) partitionCount, BIGINT));
         RowExpression randomNumberVarchar = call("CAST", functionAndTypeManager.lookupCast(CAST, randomNumber.getType(), VARCHAR), VARCHAR, randomNumber);
-        RowExpression concatExpression = call(functionAndTypeManager,
+        RowExpression concatExpression = call(functionAndTypeManager.getFunctionAndTypeResolver(),
                 "concat",
                 VARCHAR,
                 ImmutableList.of(constant(Slices.utf8Slice(prefix), VARCHAR), randomNumberVarchar));
@@ -800,7 +800,7 @@ public class PlannerUtils
         if (hashExpressionList.size() > 1) {
             hashExpression = orNullHashCode(hashExpression);
             for (int i = 1; i < hashExpressionList.size(); ++i) {
-                hashExpression = call(functionAndTypeManager, "combine_hash", BIGINT, hashExpression, orNullHashCode(hashExpressionList.get(i)));
+                hashExpression = call(functionAndTypeManager.getFunctionAndTypeResolver(), "combine_hash", BIGINT, hashExpression, orNullHashCode(hashExpressionList.get(i)));
             }
         }
         return hashExpression;

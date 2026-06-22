@@ -40,6 +40,13 @@
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-optimizer-common</artifactId>
+            <version>0.298-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
+	
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
             <artifactId>presto-tpch</artifactId>
         </dependency>
 

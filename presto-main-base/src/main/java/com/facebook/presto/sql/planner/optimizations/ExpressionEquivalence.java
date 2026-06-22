@@ -31,6 +31,7 @@ import com.facebook.presto.spi.relation.SpecialFormExpression.Form;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.TypeProvider;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.NodeRef;
 import com.google.common.collect.ComparisonChain;
@@ -121,7 +122,13 @@ public class ExpressionEquivalence
                 WarningCollector.NOOP);
 
         // convert to row expression
-        return translate(expression, expressionTypes, variableInput, metadata.getFunctionAndTypeManager(), session);
+        return translate(
+                expression,
+                expressionTypes,
+                variableInput,
+                metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                session.toConnectorSession());
     }
 
     private static class CanonicalizationVisitor

@@ -242,7 +242,7 @@ public class SimplifyRowExpressions
             RowExpression keyArray = buildArrayConstructor(keyType, keys);
             RowExpression valueArray = buildArrayConstructor(valueType, values);
 
-            return call(functionAndTypeManager, "MAP", node.getType(), keyArray, valueArray);
+            return call(functionAndTypeManager.getFunctionAndTypeResolver(), "MAP", node.getType(), keyArray, valueArray);
         }
 
         private RowExpression buildArrayConstructor(Type elementType, List<RowExpression> elements)

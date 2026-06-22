@@ -35,6 +35,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.analyzer.MetadataResolver;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -168,8 +169,8 @@ public class InformationSchemaMetadata
     private InformationSchemaTableHandle checkTableHandle(ConnectorTableHandle tableHandle)
     {
         InformationSchemaTableHandle handle = (InformationSchemaTableHandle) tableHandle;
-        checkArgument(handle.getCatalogName().equals(catalogName), "invalid table handle: expected catalog %s but got %s", catalogName, handle.getCatalogName());
-        checkArgument(TABLES.containsKey(handle.getSchemaTableName()), "table %s does not exist", handle.getSchemaTableName());
+        Preconditions.checkArgument(handle.getCatalogName().equals(catalogName), "invalid table handle: expected catalog %s but got %s", catalogName, handle.getCatalogName());
+        Preconditions.checkArgument(TABLES.containsKey(handle.getSchemaTableName()), "table %s does not exist", handle.getSchemaTableName());
         return handle;
     }
 

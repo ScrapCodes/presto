@@ -131,8 +131,8 @@ public class RemoveRedundantCastToVarcharInJoinClause
             RowExpression rightAssignment = ((CallExpression) rightProjectAssignment).getArguments().get(0);
 
             if (!leftAssignment.getType().equals(rightAssignment.getType())) {
-                leftAssignment = castToBigInt(functionAndTypeManager, leftAssignment);
-                rightAssignment = castToBigInt(functionAndTypeManager, rightAssignment);
+                leftAssignment = castToBigInt(functionAndTypeManager.getFunctionAndTypeResolver(), leftAssignment);
+                rightAssignment = castToBigInt(functionAndTypeManager.getFunctionAndTypeResolver(), rightAssignment);
             }
 
             VariableReferenceExpression newLeft = context.getVariableAllocator().newVariable(leftAssignment);

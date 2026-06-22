@@ -96,6 +96,7 @@ import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.ExpressionInterpreter;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.VariablesExtractor;
+import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
 import com.facebook.presto.sql.relational.SqlToRowExpressionTranslator;
 import com.facebook.presto.sql.tree.AddColumn;
@@ -2826,8 +2827,9 @@ class StatementAnalyzer
                             filteredWhereClause,
                             analysis.getTypes(),
                             ImmutableMap.of(),
-                            metadata.getFunctionAndTypeManager(),
-                            session);
+                            metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver(),
+                            new FunctionResolution(metadata.getFunctionAndTypeManager().getFunctionAndTypeResolver()),
+                            session.toConnectorSession());
 
                     TupleDomain<String> viewQueryDomain = MaterializedViewUtils.getDomainFromFilter(session, domainTranslator, rowExpression);
 

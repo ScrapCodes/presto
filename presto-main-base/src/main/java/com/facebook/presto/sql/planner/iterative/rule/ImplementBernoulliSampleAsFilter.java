@@ -75,7 +75,7 @@ public class ImplementBernoulliSampleAsFilter
                 comparisonExpression(
                         functionResolution,
                         LESS_THAN,
-                        call(functionAndTypeManager, "rand", DOUBLE),
+                        call(functionAndTypeManager.getFunctionAndTypeResolver(), "rand", DOUBLE),
                         new ConstantExpression(sample.getSampleRatio(), DOUBLE))));
     }
 }
